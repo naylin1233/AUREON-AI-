@@ -14,7 +14,7 @@ const sampleVoice=path.join(dataDir,'actor-sample.wav');
 let child;
 async function start(){
  child=spawn(process.execPath,['--import','tsx','server/index.ts'],{
-  env:{...process.env,HOST:'127.0.0.1',PORT:String(port),AUREON_DATA_DIR:dataDir,AUREON_MAX_UPLOAD_MB:'8',AZURE_SPEECH_KEY:'',AZURE_SPEECH_REGION:''},
+  env:{...process.env,HOST:'127.0.0.1',PORT:String(port),AUREON_DATA_DIR:dataDir,AUREON_MAX_UPLOAD_MB:'8',AZURE_SPEECH_KEY:'',AZURE_SPEECH_REGION:'',YOUTUBE_API_KEY:''},
   stdio:'ignore'
  });
  for(let i=0;i<80;i++){
@@ -31,6 +31,9 @@ try{
  await execFileAsync('ffmpeg',['-y','-hide_banner','-loglevel','error','-f','lavfi','-i','color=c=black:s=160x120:d=2','-f','lavfi','-i','sine=frequency=1000:duration=2','-c:v','mpeg4','-c:a','aac','-shortest',sampleVideo]);
  await execFileAsync('ffmpeg',['-y','-hide_banner','-loglevel','error','-f','lavfi','-i','sine=frequency=440:duration=1','-c:a','pcm_s16le',sampleVoice]);
  await start();
+ const dailyStatus=await (await fetch(base+'/api/daily-topic/status')).json();
+ assert.equal(dailyStatus.configured,false);assert.equal(dailyStatus.schedule,'06:00 Asia/Bangkok daily');assert.equal(dailyStatus.latest,null);
+ const dailyUnavailable=await fetch(base+'/api/daily-topic/select',{method:'POST'});assert.equal(dailyUnavailable.status,503);assert.match((await dailyUnavailable.json()).note,/not configured/i);
  const health=await (await fetch(base+'/api/health')).json();
  assert.equal(health.ok,true);
  assert.equal(health.features.mediaPreparation,true);
@@ -82,7 +85,8 @@ try{
  const referenceResponse=await fetch(base+`/api/projects/${project.id}/references`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url:'https://www.youtube.com/@sample-recap',channelName:'Sample Recap',language:'English',notes:'Study pacing only',authorizedForUse:false})});assert.equal(referenceResponse.status,201);const reference=(await referenceResponse.json()).item;assert.equal(reference.kind,'channel');assert.equal(reference.rightsStatus,'reference_only');
  const referenceVideo=await fetch(base+`/api/projects/${project.id}/references`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url:'https://www.youtube.com/watch?v=abcdefghijk',title:'Sample video',authorizedForUse:true})});assert.equal(referenceVideo.status,201);assert.equal((await referenceVideo.json()).item.kind,'video');
  const references=(await (await fetch(base+`/api/projects/${project.id}/references`)).json()).items;assert.equal(references.length,2);
-\n const form=new FormData();
+
+ const form=new FormData();
  form.append('video',new Blob([await readFile(sampleVideo)],{type:'video/mp4'}),'sample.mp4');
  const uploadResponse=await fetch(base+`/api/projects/${project.id}/upload`,{method:'POST',body:form});
  assert.equal(uploadResponse.status,201);
