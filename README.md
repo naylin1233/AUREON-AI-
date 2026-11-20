@@ -58,10 +58,17 @@ docker build -t aureon-ai .
 docker run --rm -p 8787:8787 -v aureon-data:/app/storage/data aureon-ai
 ```
 
+### Stage 6 — Bilingual subtitle editor
+- Import SRT and WebVTT files.
+- Edit Myanmar and English cue text and timestamps.
+- Export separate Myanmar/English SRT or VTT files.
+- Validate timestamp order and malformed cue timing.
+- Automatic translation and speech recognition are not included yet.
+
 ## Not implemented yet
 - Automatic speech recognition / transcript extraction from uploaded video.
 - Chunk summarization and long-video transcript orchestration.
-- Subtitle translation, timing and SRT/VTT export.
+- Automatic subtitle translation and speech-to-text alignment.
 - Scene selection, 3D scene generation and final video rendering.
 - Personal voice cloning.
 - YouTube/Facebook/TikTok OAuth, scheduling and automatic publishing.
