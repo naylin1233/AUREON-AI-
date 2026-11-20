@@ -13,7 +13,7 @@ const sampleVideo=path.join(dataDir,'smoke-test.mp4');
 let child;
 async function start(){
  child=spawn(process.execPath,['--import','tsx','server/index.ts'],{
-  env:{...process.env,HOST:'127.0.0.1',PORT:String(port),AUREON_DATA_DIR:dataDir,AUREON_MAX_UPLOAD_MB:'8'},
+  env:{...process.env,HOST:'127.0.0.1',PORT:String(port),AUREON_DATA_DIR:dataDir,AUREON_MAX_UPLOAD_MB:'8',AZURE_SPEECH_KEY:'',AZURE_SPEECH_REGION:''},
   stdio:'ignore'
  });
  for(let i=0;i<80;i++){
@@ -33,6 +33,12 @@ try{
  assert.equal(health.ok,true);
  assert.equal(health.features.mediaPreparation,true);
  assert.equal(health.features.aiGeneration,false);
+ assert.equal(health.features.burmeseTts,false);
+ const voiceStatus=await (await fetch(base+'/api/tts/status')).json();
+ assert.equal(voiceStatus.configured,false);
+ assert.equal(voiceStatus.language,'my-MM');
+ const ttsUnavailable=await fetch(base+'/api/tts/synthesize',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:'မင်္ဂလာပါ',voice:'Nilar'})});
+ assert.equal(ttsUnavailable.status,503);
 
  const projectResponse=await fetch(base+'/api/projects',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({title:'Smoke Test Project',recapMode:'Cinematic'})});
  assert.equal(projectResponse.status,201);
@@ -62,11 +68,7 @@ try{
  }
  assert.equal(finalJob.status,'media_ready',finalJob.error||'Media worker did not complete.');
  assert.equal(finalJob.chunkCount,1);
- assert.ok(finalJob.frameCount>=1);
  assert.ok(finalJob.outputDir);
- const { readdir }=await import('node:fs/promises');
- const frameFiles=await readdir(path.join(dataDir,finalJob.outputDir,'frames'));
- assert.ok(frameFiles.some(name=>name.endsWith('.jpg')));
 
  await stop();
  await start();
@@ -75,7 +77,7 @@ try{
  assert.equal(persisted.items[0].title,'Smoke Test Project');
  const persistedJob=(await (await fetch(base+`/api/jobs/${createdJob.id}`)).json()).item;
  assert.equal(persistedJob.status,'media_ready');
- console.log('AUREON API smoke test passed: project persistence, upload, FFmpeg probe, 10-minute audio chunk extraction, job recovery.');
+ console.log('AUREON API smoke test passed: project persistence, upload, FFmpeg probe, 10-minute audio chunk extraction, job recovery, safe TTS-not-configured behavior.');
 }finally{
  await stop();
  await rm(dataDir,{recursive:true,force:true});

@@ -26,3 +26,10 @@
 .job-card p{font-size:10px;line-height:1.7;color:#aaa087;margin:12px 0}
 .job-card .job-error{color:#f1a29a}
 .job-card small{font-size:9px;color:#b5a477}
+
+.voice-text{display:grid;gap:8px;color:#b9ad8e;font-size:10px;margin:18px 0}
+.voice-text textarea{width:100%;resize:vertical;min-height:130px;background:#100f0c;border:1px solid #51452a;border-radius:8px;padding:13px;color:#eee3c6;font:12px/1.8 Inter,'Noto Sans Myanmar',sans-serif}
+.voice-text small{font-size:9px;color:#8f856d;text-align:right}
+.audio-result{display:grid;gap:10px;margin-top:18px;border:1px solid #51452a;border-radius:10px;padding:15px;background:#15130f}
+.audio-result b{font-size:11px;color:#f0e5ca}
+.audio-result audio{width:100%;height:40px}
