@@ -35,6 +35,7 @@ try{
  assert.equal(health.features.aiGeneration,false);
  assert.equal(health.features.burmeseTts,false);
  assert.equal(health.features.aiScriptGeneration,false);
+ assert.equal(health.features.audioTranscription,false);
  const aiStatus=await (await fetch(base+'/api/ai/status')).json();
  assert.equal(aiStatus.configured,false);
  const aiNoConsent=await fetch(base+'/api/ai/recap-script',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({transcript:'ဇာတ်လမ်းအကျဉ်း',recapMode:'Cinematic',consent:false})});
@@ -78,6 +79,10 @@ try{
  assert.equal(finalJob.status,'media_ready',finalJob.error||'Media worker did not complete.');
  assert.equal(finalJob.chunkCount,1);
  assert.ok(finalJob.outputDir);
+ const transcribeNoConsent=await fetch(base+`/api/jobs/${createdJob.id}/transcribe`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({consent:false})});
+ assert.equal(transcribeNoConsent.status,400);
+ const transcribeUnavailable=await fetch(base+`/api/jobs/${createdJob.id}/transcribe`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({consent:true})});
+ assert.equal(transcribeUnavailable.status,503);
 
  await stop();
  await start();
@@ -86,7 +91,7 @@ try{
  assert.equal(persisted.items[0].title,'Smoke Test Project');
  const persistedJob=(await (await fetch(base+`/api/jobs/${createdJob.id}`)).json()).item;
  assert.equal(persistedJob.status,'media_ready');
- console.log('AUREON API smoke test passed: project persistence, upload, FFmpeg probe, 10-minute audio chunk extraction, job recovery, safe TTS/AI-not-configured behavior.');
+ console.log('AUREON API smoke test passed: project persistence, upload, FFmpeg probe, 10-minute audio chunk extraction, job recovery, safe TTS/AI-not-configured behavior and transcription consent gate.');
 }finally{
  await stop();
  await rm(dataDir,{recursive:true,force:true});
