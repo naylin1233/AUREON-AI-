@@ -207,6 +207,21 @@ app.post('/api/jobs/:id/transcribe',async(req,res,next)=>{
   res.status(202).json({item:getJob(id),note:'Audio transcription queued. The video audio will be sent to Google Gemini under the consent you confirmed.'});
  }catch(e){next(e)}
 });
+app.post('/api/jobs/:id/recap-script',async(req,res,next)=>{
+ try{
+  const id=String(req.params.id);
+  const job=getJob(id);
+  if(!job)return res.status(404).json({error:'Job not found.'});
+  if(req.body?.consent!==true)return res.status(400).json({error:'Confirm that this transcript may be sent to Google Gemini for Burmese recap script generation.'});
+  if(job.status!=='transcribed'||!job.transcript?.trim())return res.status(409).json({error:'Complete audio transcription before generating a recap script.'});
+  const project=getProject(job.projectId);
+  if(!project)return res.status(404).json({error:'Project not found.'});
+  if(!geminiStatus().configured)return res.status(503).json({error:'AI recap is not configured. Add GEMINI_API_KEY to the private server environment.'});
+  const result=await generateBurmeseRecap({transcript:job.transcript,mode:project.recapMode,title:project.title});
+  const item=await updateJob(id,{recapScript:result.script,recapScriptModel:result.model,recapScriptGeneratedAt:new Date().toISOString(),note:'Burmese recap script draft generated and saved. Review all names and story details before use.'});
+  res.status(201).json({item,note:'Burmese recap script draft generated and saved to this job. Review all names and story details before use.'});
+ }catch(e){next(e)}
+});
 app.use(express.static(path.resolve(process.cwd(),'dist')));
 app.use((error:unknown,_req:Request,res:Response,_next:NextFunction)=>{
  const err=error as Error & {code?:string};
