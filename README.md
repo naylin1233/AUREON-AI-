@@ -80,7 +80,13 @@ docker run --rm -p 8787:8787 -v aureon-data:/app/storage/data aureon-ai
 - Exposes render status and MP4 download endpoints.
 - Re-encodes video to H.264 and audio to AAC for MP4 compatibility.
 
-## Foreign YouTube recap references\n\n- Save public YouTube channel or video URLs against a project, with language, title, channel name and private notes.\n- URL references are metadata only: the app does not download videos, audio, captions, transcripts or channel content.\n- Mark a source as authorized only when you actually own it or hold the necessary license/permission. A checkbox is a declaration, not a legal verification. Reference-only sources may inform high-level format research, but scripts and edits must be original and must not reproduce another creator's narration, wording or edit.\n\n### Stage 9 — Transcript-to-Burmese recap script
+## Foreign YouTube recap references
+
+- Save public YouTube channel or video URLs against a project, with language, title, channel name and private notes.
+- URL references are metadata only: the app does not download videos, audio, captions, transcripts or channel content.
+- Mark a source as authorized only when you actually own it or hold the necessary license/permission. A checkbox is a declaration, not a legal verification. Reference-only sources may inform high-level format research, but scripts and edits must be original and must not reproduce another creator's narration, wording or edit.
+
+### Stage 9 — Transcript-to-Burmese recap script
 - A completed transcription job can generate a Burmese recap script directly from its saved transcript.
 - Uses the recap mode and project title already selected for that project.
 - Requires a separate explicit consent action before sending the transcript to Google Gemini.
@@ -95,7 +101,15 @@ docker run --rm -p 8787:8787 -v aureon-data:/app/storage/data aureon-ai
 - TikTok: 30–60 second vertical teaser, unique hook/caption, and a CTA pointing viewers to the YouTube full recap.
 - TikTok CTA intentionally uses `[YOUTUBE FULL VIDEO LINK]`; replace it with the real published YouTube URL before posting.
 - Requires explicit consent before sending the recap draft to Gemini. Output is a draft for human review, not an automatic post.
-- The platform pack does not establish which topics are currently popular. Daily trend discovery, no-repeat topic scheduling and social publishing are still separate work.
+- Daily trend discovery is described in Stage 11. Social OAuth publishing remains unimplemented.
+
+### Stage 11 — Daily trending topic selection
+- At 06:00 Asia/Bangkok, the server searches recent (last 30 days) public YouTube videos across Anime, foreign movies, 3D animation and Chinese donghua.
+- Video search uses YouTube `order=viewCount`; the selected candidate is checked against the saved 30-day history to avoid repeating the same video ID or exact title.
+- Saves the selected topic metadata, category, channel, publication date and observed view count in the persistent JSON state.
+- References Studio displays the latest selection and allows a manual selection attempt.
+- Requires `YOUTUBE_API_KEY`; without it, the system reports that selection is unavailable and does not invent a topic.
+- This selects a popular reference topic only. It does not identify or download the underlying movie, analyze its plot, create a recap script, or publish a video automatically.
 
 ## Not implemented yet
 - Automatic speech recognition or transcript extraction from uploaded videos.
@@ -136,4 +150,4 @@ The Myanmar Voice Studio supports adding consented actor recordings as named cha
 
 The Reference Library can discover public recap channels and videos using the official YouTube Data API v3. Set `YOUTUBE_API_KEY` in the private server environment after enabling YouTube Data API v3 in a Google Cloud project. Optional `YOUTUBE_REFERENCE_QUERIES` accepts up to four semicolon-separated search terms; defaults cover popular anime recap, foreign movie recap, 3D animation movie recap and Chinese donghua recap. Video searches are ordered by YouTube view count; channel searches are relevance-ranked. This discovers references across categories, not just donghua.
 
-The server runs discovery daily at **06:15 Asia/Bangkok** and saves metadata-only references to existing projects. The References page also has a manual search button. Each run makes up to eight `search.list` requests (four terms × channel/video); YouTube's default quota allows 100 search requests per day. Keep the key private and restrict it to the YouTube Data API. Search results are marked **REFERENCE ONLY**. This feature does not download videos, audio, transcripts, or captions, and it does not verify reuse rights. Only import or adapt source material when you have permission or a suitable license. The feature does not enable paid billing.
+The server runs reference discovery daily at **06:15 Asia/Bangkok** and saves metadata-only references to existing projects. A separate daily topic selector runs at **06:00 Asia/Bangkok** and stores one non-repeating trending video reference in topic history. The References page also has a manual search button. Each reference-discovery run makes up to eight `search.list` requests (four terms × channel/video). Daily topic selection makes up to four additional video searches plus one statistics lookup; YouTube's default quota allows 100 search requests per day. Keep the key private and restrict it to the YouTube Data API. Search results are marked **REFERENCE ONLY**. This feature does not download videos, audio, transcripts, or captions, and it does not verify reuse rights. Only import or adapt source material when you have permission or a suitable license. The feature does not enable paid billing.
