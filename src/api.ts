@@ -14,12 +14,15 @@ export type DailyTopicStatus = {configured:boolean;schedule:string;latest:DailyT
 export type PlatformPack = {youtube:{title:string;description:string;script:string;tags:string[]};facebook:{title:string;caption:string;script:string;tags:string[]};tiktok:{hook:string;caption:string;script:string;cta:string;tags:string[]}};
 export type Job = {id:string;projectId:string;sourceId?:string;kind:'recap';status:'queued'|'processing'|'media_ready'|'transcribing'|'transcribed'|'failed'|'awaiting_pipeline';stage:string;progress:number;note:string;error?:string;outputDir?:string;chunkCount?:number;durationSeconds?:number;transcript?:string;recapScript?:string;recapScriptModel?:string;recapScriptGeneratedAt?:string;transcriptChunks?:string[];transcribedChunkCount?:number;transcriptionTotalChunks?:number;createdAt:string;updatedAt:string};
 async function request<T>(url:string,init?:RequestInit):Promise<T>{
- const response=await fetch(url,init);
+ const response=await fetch(url,{...init,credentials:init?.credentials??'same-origin'});
  const data=await response.json().catch(()=>({error:'Invalid API response'}));
  if(!response.ok)throw new Error(data.error||`Request failed (${response.status})`);
  return data as T;
 }
 export const api={
+ authStatus:()=>request<{configured:boolean;authenticated:boolean}>('/api/auth/status'),
+ login:(password:string)=>request<{authenticated:boolean}>('/api/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({password})}),
+ logout:()=>request<{authenticated:boolean}>('/api/auth/logout',{method:'POST'}),
  health:()=>request<{ok:boolean;service:string;features:Record<string,boolean>}>('/api/health'),
  projects:()=>request<{items:Project[]}>('/api/projects'),
  createProject:(title:string,recapMode:string)=>request<{item:Project}>('/api/projects',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({title,recapMode})}),
