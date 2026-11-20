@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
+export type DailyTopic = {id:string;date:string;videoId:string;title:string;channelName:string;url:string;category:string;viewCount:number;publishedAt:string;selectedAt:string};
 export type Project = { id:string; title:string; recapMode:string; createdAt:string; sourceIds:string[] };
 export type Source = { id:string; projectId:string; kind:'upload'|'url'; name:string; path?:string; url?:string; mimeType?:string; size?:number; status:'stored'|'awaiting_review'; createdAt:string };
 export type ReferenceSource = {id:string;projectId:string;kind:'channel'|'video';url:string;title:string;channelName:string;language:string;notes:string;rightsStatus:'reference_only'|'authorized_for_use';createdAt:string};
@@ -13,8 +14,8 @@ export type RenderJob = {id:string;projectId:string;sourceId:string;status:'queu
 export type VoiceProfile = {id:string;name:string;character:string;language:'my-MM';fileName:string;path:string;mimeType:string;size:number;consentConfirmed:true;createdAt:string};
 export type JobStatus = 'queued'|'processing'|'media_ready'|'transcribing'|'transcribed'|'failed'|'awaiting_pipeline';
 export type Job = { id:string; projectId:string; sourceId?:string; kind:'recap'; status:JobStatus; stage:string; progress:number; note:string; error?:string; outputDir?:string; durationSeconds?:number; chunkCount?:number; transcript?:string; recapScript?:string; recapScriptModel?:string; recapScriptGeneratedAt?:string; transcriptChunks?:string[]; transcriptionConsentAt?:string; transcribedChunkCount?:number; transcriptionTotalChunks?:number; createdAt:string; updatedAt:string };
-type State = { projects:Project[]; sources:Source[]; referenceSources:ReferenceSource[]; jobs:Job[]; voices:VoiceProfile[]; voiceAssignments:VoiceAssignment[]; dialogueClips:DialogueClip[]; subtitleTracks:SubtitleTrack[]; renderJobs:RenderJob[] };
-const empty = ():State => ({projects:[],sources:[],referenceSources:[],jobs:[],voices:[],voiceAssignments:[],dialogueClips:[],subtitleTracks:[],renderJobs:[]});
+type State = { projects:Project[]; sources:Source[]; referenceSources:ReferenceSource[]; jobs:Job[]; voices:VoiceProfile[]; voiceAssignments:VoiceAssignment[]; dialogueClips:DialogueClip[]; subtitleTracks:SubtitleTrack[]; renderJobs:RenderJob[]; dailyTopics:DailyTopic[] };
+const empty = ():State => ({projects:[],sources:[],referenceSources:[],jobs:[],voices:[],voiceAssignments:[],dialogueClips:[],subtitleTracks:[],renderJobs:[],dailyTopics:[]});
 const dataDir = path.resolve(process.env.AUREON_DATA_DIR || './storage/data');
 const statePath = path.join(dataDir,'state.json');
 let state:State = empty();
@@ -22,7 +23,7 @@ let writeChain = Promise.resolve();
 
 export async function initializeStore(){
  await mkdir(dataDir,{recursive:true});
- try { const parsed=JSON.parse(await readFile(statePath,'utf8')) as Partial<State>; state={projects:Array.isArray(parsed.projects)?parsed.projects:[],sources:Array.isArray(parsed.sources)?parsed.sources:[],referenceSources:Array.isArray(parsed.referenceSources)?parsed.referenceSources:[],jobs:Array.isArray(parsed.jobs)?parsed.jobs:[],voices:Array.isArray(parsed.voices)?parsed.voices:[],voiceAssignments:Array.isArray(parsed.voiceAssignments)?parsed.voiceAssignments:[],dialogueClips:Array.isArray(parsed.dialogueClips)?parsed.dialogueClips:[],subtitleTracks:Array.isArray(parsed.subtitleTracks)?parsed.subtitleTracks:[],renderJobs:Array.isArray(parsed.renderJobs)?parsed.renderJobs:[]}; }
+ try { const parsed=JSON.parse(await readFile(statePath,'utf8')) as Partial<State>; state={projects:Array.isArray(parsed.projects)?parsed.projects:[],sources:Array.isArray(parsed.sources)?parsed.sources:[],referenceSources:Array.isArray(parsed.referenceSources)?parsed.referenceSources:[],jobs:Array.isArray(parsed.jobs)?parsed.jobs:[],voices:Array.isArray(parsed.voices)?parsed.voices:[],voiceAssignments:Array.isArray(parsed.voiceAssignments)?parsed.voiceAssignments:[],dialogueClips:Array.isArray(parsed.dialogueClips)?parsed.dialogueClips:[],subtitleTracks:Array.isArray(parsed.subtitleTracks)?parsed.subtitleTracks:[],renderJobs:Array.isArray(parsed.renderJobs)?parsed.renderJobs:[],dailyTopics:Array.isArray(parsed.dailyTopics)?parsed.dailyTopics:[]}; }
  catch(error){ if((error as NodeJS.ErrnoException).code!=='ENOENT') throw error; await persist(); }
 }
 async function persist(){
@@ -80,3 +81,6 @@ export async function assignVoiceToCharacter(input:{projectId:string;voiceProfil
 
 export function getReferenceSources(projectId:string){return state.referenceSources.filter(x=>x.projectId===projectId).sort((a,b)=>b.createdAt.localeCompare(a.createdAt));}
 export async function addReferenceSource(input:Omit<ReferenceSource,'id'|'createdAt'>){const existing=state.referenceSources.find(x=>x.projectId===input.projectId&&x.url===input.url);if(existing){Object.assign(existing,input);await persist();return existing;}const item:ReferenceSource={...input,id:randomUUID(),createdAt:new Date().toISOString()};state.referenceSources.push(item);await persist();return item;}
+
+export function getDailyTopics(){return [...state.dailyTopics].sort((a,b)=>b.date.localeCompare(a.date));}
+export async function addDailyTopic(input:Omit<DailyTopic,'id'|'selectedAt'>){const existing=state.dailyTopics.find(x=>x.date===input.date);if(existing)return existing;const item:DailyTopic={...input,id:randomUUID(),selectedAt:new Date().toISOString()};state.dailyTopics.push(item);await persist();return item;}
