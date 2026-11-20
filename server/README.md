@@ -8,8 +8,7 @@
 - FFmpeg/FFprobe worker for uploaded local video:
   - validates duration and audio stream;
   - extracts mono 16 kHz PCM WAV into 10-minute chunks;
-  - samples 480px-wide JPEG reference frames every 30 seconds;
-  - records progress, audio chunk count, sampled frame count, output directory and errors;
+  - records progress, audio chunk count, output directory and errors;
   - re-enqueues queued/processing jobs after server restart, reuses validated completed chunks, and reprocesses incomplete chunks.
 - Job status endpoint: `GET /api/jobs/:id`.
 - Optional bearer-token API protection via `AUREON_API_TOKEN`.
@@ -36,7 +35,7 @@ docker run --rm -p 8787:8787 -v aureon-data:/app/storage/data aureon-ai
 For a public deployment, configure a strong `AUREON_API_TOKEN`, HTTPS and a trusted reverse proxy. The sample container is a single-user foundation, not a hardened multi-tenant service.
 
 ## Storage and processing
-Local data lives under `storage/data/` (ignored by Git). Uploaded files are under `uploads/`; extracted chunks and `frames/` reference images are under `processed/<job-id>/`. Back up this directory. A two-hour source creates approximately twelve ten-minute WAV chunks. Chunk extraction is actual FFmpeg work; it is not AI transcription or recap generation.
+Local data lives under `storage/data/` (ignored by Git). Uploaded files are under `uploads/`; extracted chunks are under `processed/<job-id>/`. Back up this directory. A two-hour source creates approximately twelve ten-minute WAV chunks. Chunk extraction is actual FFmpeg work; it is not AI transcription or recap generation.
 
 ## Not implemented yet
 No AI story analysis/script generation, Myanmar TTS or voice cloning, scene-aware video editing/rendering, subtitle alignment/export, distributed job queue, remote URL downloading, cloud object storage, managed database, social OAuth, scheduled/automatic publishing, or Android package. Jobs reach `media_ready` after audio chunk and sampled frame extraction; AI scene analysis and recap generation have not started.
