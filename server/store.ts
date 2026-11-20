@@ -4,8 +4,8 @@ import path from 'node:path';
 
 export type Project = { id:string; title:string; recapMode:string; createdAt:string; sourceIds:string[] };
 export type Source = { id:string; projectId:string; kind:'upload'|'url'; name:string; path?:string; url?:string; mimeType?:string; size?:number; status:'stored'|'awaiting_review'; createdAt:string };
-export type JobStatus = 'queued'|'processing'|'media_ready'|'failed'|'awaiting_pipeline';
-export type Job = { id:string; projectId:string; sourceId?:string; kind:'recap'; status:JobStatus; stage:string; progress:number; note:string; error?:string; outputDir?:string; durationSeconds?:number; chunkCount?:number; createdAt:string; updatedAt:string };
+export type JobStatus = 'queued'|'processing'|'media_ready'|'transcribing'|'transcribed'|'failed'|'awaiting_pipeline';
+export type Job = { id:string; projectId:string; sourceId?:string; kind:'recap'; status:JobStatus; stage:string; progress:number; note:string; error?:string; outputDir?:string; durationSeconds?:number; chunkCount?:number; transcript?:string; transcriptChunks?:string[]; transcriptionConsentAt?:string; transcribedChunkCount?:number; transcriptionTotalChunks?:number; createdAt:string; updatedAt:string };
 type State = { projects:Project[]; sources:Source[]; jobs:Job[] };
 const empty = ():State => ({projects:[],sources:[],jobs:[]});
 const dataDir = path.resolve(process.env.AUREON_DATA_DIR || './storage/data');
