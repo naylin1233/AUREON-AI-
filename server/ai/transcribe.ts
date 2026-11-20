@@ -38,7 +38,7 @@ export async function transcribeAudioChunk(filePath:string,chunkIndex:number){
    'X-Goog-Upload-Command':'upload, finalize',
    'Content-Type':'audio/wav'
   },
-  body:bytes,
+  body:bytes as unknown as BodyInit,
   signal:AbortSignal.timeout(180000)
  });
  if(!uploaded.ok)throw new Error('Gemini audio upload failed: '+await errorMessage(uploaded));
