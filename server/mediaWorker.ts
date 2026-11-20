@@ -1,5 +1,5 @@
 import { spawn } from 'node:child_process';
-import { mkdir, readdir, stat } from 'node:fs/promises';
+import { mkdir, readdir, rename, stat, unlink } from 'node:fs/promises';
 import path from 'node:path';
 import { getJob, getSource, getJobs, storageDirectory, updateJob } from './store.js';
 
@@ -13,6 +13,19 @@ function run(command:string,args:string[]){
   child.on('error',error=>reject(new Error(`Could not start ${command}. Install FFmpeg and ensure it is on PATH. ${error.message}`)));
   child.on('close',code=>code===0?resolve(stdout.trim()):reject(new Error(stderr.trim()||`${command} exited with code ${code}`)));
  });
+}
+async function probeDuration(filePath:string){
+ const value=await run('ffprobe',['-v','error','-show_entries','format=duration','-of','default=noprint_wrappers=1:nokey=1',filePath]);
+ const duration=Number.parseFloat(value);
+ if(!Number.isFinite(duration)||duration<=0)throw new Error('Could not read a valid media duration.');
+ return duration;
+}
+async function isCompleteChunk(filePath:string,expectedSeconds:number){
+ try{
+  const info=await stat(filePath);if(!info.isFile()||info.size<=44)return false;
+  const duration=await probeDuration(filePath);
+  return duration>=Math.min(0.5,expectedSeconds*0.5)&&Math.abs(duration-expectedSeconds)<3;
+ }catch{return false;}
 }
 let queue=Promise.resolve();
 export function enqueueMediaJob(jobId:string){
@@ -29,18 +42,35 @@ async function processMediaJob(jobId:string){
   const fileInfo=await stat(input);if(!fileInfo.isFile())throw new Error('Uploaded source file was not found.');
   await run('ffprobe',['-version']);
   await updateJob(jobId,{stage:'probing_video',progress:8,note:'Reading video duration and audio stream.'});
-  const durationText=await run('ffprobe',['-v','error','-show_entries','format=duration','-of','default=noprint_wrappers=1:nokey=1',input]);
-  const duration=Number.parseFloat(durationText);
-  if(!Number.isFinite(duration)||duration<=0)throw new Error('Could not read a valid video duration.');
+  const duration=await probeDuration(input);
   const audio=await run('ffprobe',['-v','error','-select_streams','a:0','-show_entries','stream=codec_type','-of','csv=p=0',input]);
   if(!audio.includes('audio'))throw new Error('This video has no audio track to prepare for narration analysis.');
   const outputDir=path.join(storageDirectory(),'processed',jobId);
   await mkdir(outputDir,{recursive:true});
-  await updateJob(jobId,{stage:'extracting_audio_chunks',progress:15,durationSeconds:duration,note:'Extracting mono 16 kHz WAV audio in 10-minute resumable-sized chunks.'});
-  await run('ffmpeg',['-y','-nostdin','-hide_banner','-loglevel','error','-i',input,'-map','0:a:0','-vn','-ac','1','-ar','16000','-c:a','pcm_s16le','-f','segment','-segment_time','600','-reset_timestamps','1','-segment_format','wav',path.join(outputDir,'chunk-%04d.wav')]);
+  const chunkSeconds=600;
+  const totalChunks=Math.ceil(duration/chunkSeconds);
+  let completed=0;
+  for(let index=0;index<totalChunks;index++){
+   const start=index*chunkSeconds;
+   const length=Math.min(chunkSeconds,duration-start);
+   const name=`chunk-${String(index).padStart(4,'0')}.wav`;
+   const finalPath=path.join(outputDir,name);
+   if(await isCompleteChunk(finalPath,length)){completed++;}
+   else{
+    await unlink(finalPath).catch(()=>undefined);
+    const tempPath=path.join(outputDir,`chunk-${String(index).padStart(4,'0')}.partial.wav`);
+    await unlink(tempPath).catch(()=>undefined);
+    await updateJob(jobId,{stage:`extracting_chunk_${index+1}_of_${totalChunks}`,progress:15+Math.floor((completed/totalChunks)*80),durationSeconds:duration,chunkCount:completed,note:`Preparing audio chunk ${index+1} of ${totalChunks}. Existing valid chunks are retained when a job resumes.`});
+    await run('ffmpeg',['-y','-nostdin','-hide_banner','-loglevel','error','-ss',String(start),'-i',input,'-t',String(length),'-map','0:a:0','-vn','-ac','1','-ar','16000','-c:a','pcm_s16le','-f','wav',tempPath]);
+    if(!(await isCompleteChunk(tempPath,length)))throw new Error(`Audio chunk ${index+1} failed validation after FFmpeg extraction.`);
+    await rename(tempPath,finalPath);
+    completed++;
+   }
+   await updateJob(jobId,{stage:`extracting_chunk_${index+1}_of_${totalChunks}`,progress:15+Math.floor((completed/totalChunks)*80),durationSeconds:duration,chunkCount:completed,note:`Prepared ${completed} of ${totalChunks} audio chunks. The worker can skip completed chunks after a restart.`});
+  }
   const chunks=(await readdir(outputDir)).filter(name=>/^chunk-\d+\.wav$/.test(name)).sort();
-  if(chunks.length===0)throw new Error('FFmpeg completed but no audio chunks were produced.');
-  await updateJob(jobId,{status:'media_ready',stage:'media_preparation_complete',progress:100,chunkCount:chunks.length,outputDir:path.relative(process.cwd(),outputDir),note:`Media preparation complete: ${chunks.length} audio chunk(s). AI story analysis, Burmese TTS and video rendering are separate stages and have not started.`});
+  if(chunks.length!==totalChunks)throw new Error('Audio chunk count validation failed.');
+  await updateJob(jobId,{status:'media_ready',stage:'media_preparation_complete',progress:100,chunkCount:chunks.length,durationSeconds:duration,outputDir:path.relative(process.cwd(),outputDir),note:`Media preparation complete: ${chunks.length} validated audio chunk(s). AI story analysis, Burmese TTS and video rendering have not started.`});
  }catch(error){
   const message=error instanceof Error?error.message:'Unknown media processing error';
   await updateJob(jobId,{status:'failed',stage:'media_preparation_failed',progress:0,error:message,note:'Media preparation failed. Check FFmpeg installation and the uploaded file.'});
@@ -49,7 +79,7 @@ async function processMediaJob(jobId:string){
 export async function resumePendingMediaJobs(){
  for(const job of getJobs()){
   if(job.status==='queued'||job.status==='processing'){
-   await updateJob(job.id,{status:'queued',stage:'queued',progress:0,note:'Resumed after server restart.'});
+   await updateJob(job.id,{status:'queued',stage:'queued',progress:job.progress||0,note:'Resuming media preparation; valid completed chunks will be reused.'});
    void enqueueMediaJob(job.id);
   }
  }
