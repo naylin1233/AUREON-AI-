@@ -34,6 +34,13 @@ try{
  assert.equal(health.features.mediaPreparation,true);
  assert.equal(health.features.aiGeneration,false);
  assert.equal(health.features.burmeseTts,false);
+ assert.equal(health.features.aiScriptGeneration,false);
+ const aiStatus=await (await fetch(base+'/api/ai/status')).json();
+ assert.equal(aiStatus.configured,false);
+ const aiUnavailable=await fetch(base+'/api/ai/recap-script',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({transcript:'ဇာတ်လမ်းအကျဉ်း',recapMode:'Cinematic'})});
+ assert.equal(aiUnavailable.status,503);
+ const aiInvalid=await fetch(base+'/api/ai/recap-script',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({transcript:'',recapMode:'Cinematic'})});
+ assert.equal(aiInvalid.status,400);
  const voiceStatus=await (await fetch(base+'/api/tts/status')).json();
  assert.equal(voiceStatus.configured,false);
  assert.equal(voiceStatus.language,'my-MM');
@@ -77,7 +84,7 @@ try{
  assert.equal(persisted.items[0].title,'Smoke Test Project');
  const persistedJob=(await (await fetch(base+`/api/jobs/${createdJob.id}`)).json()).item;
  assert.equal(persistedJob.status,'media_ready');
- console.log('AUREON API smoke test passed: project persistence, upload, FFmpeg probe, 10-minute audio chunk extraction, job recovery, safe TTS-not-configured behavior.');
+ console.log('AUREON API smoke test passed: project persistence, upload, FFmpeg probe, 10-minute audio chunk extraction, job recovery, safe TTS/AI-not-configured behavior.');
 }finally{
  await stop();
  await rm(dataDir,{recursive:true,force:true});

@@ -1,6 +1,7 @@
 export type Project = {id:string;title:string;recapMode:string;createdAt:string;sourceIds:string[]};
 export type Source = {id:string;projectId:string;kind:'upload'|'url';name:string;path?:string;url?:string;mimeType?:string;size?:number;status:'stored'|'awaiting_review';createdAt:string};
 export type TtsVoice = 'Nilar'|'Thiha';
+export type RecapScript = {script:string;model:string;interactionId?:string;usage?:{total_tokens?:number;total_input_tokens?:number;total_output_tokens?:number}};
 export type Job = {id:string;projectId:string;sourceId?:string;kind:'recap';status:'queued'|'processing'|'media_ready'|'failed'|'awaiting_pipeline';stage:string;progress:number;note:string;error?:string;chunkCount?:number;durationSeconds?:number;createdAt:string;updatedAt:string};
 async function request<T>(url:string,init?:RequestInit):Promise<T>{
  const response=await fetch(url,init);
@@ -18,6 +19,8 @@ export const api={
  createJob:(id:string)=>request<{item:Job;note:string}>(`/api/projects/${id}/recap-jobs`,{method:'POST'}),
  job:(id:string)=>request<{item:Job}>(`/api/jobs/${id}`),
  jobs:()=>request<{items:Job[]}>('/api/jobs'),
+ aiStatus:()=>request<{configured:boolean;model:string;provider:string}>('/api/ai/status'),
+ generateRecapScript:(transcript:string,recapMode:string,title:string)=>request<{item:RecapScript;note:string}>('/api/ai/recap-script',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({transcript,recapMode,title})}),
  ttsStatus:()=>request<{configured:boolean;language:string;voices:{label:TtsVoice;id:string}[]}>('/api/tts/status'),
  synthesize:(text:string,voice:TtsVoice)=>request<{item:{id:string;bytes:number;voice:string;audioUrl:string;language:string}}>('/api/tts/synthesize',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text,voice})})
 };
