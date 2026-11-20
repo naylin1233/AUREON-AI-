@@ -60,6 +60,7 @@ app.post('/api/tts/synthesize',async(req,res,next)=>{
   const text=typeof req.body?.text==='string'?req.body.text.trim():'';
   const voice=typeof req.body?.voice==='string'?req.body.voice:'Nilar';
   if(!text||text.length>4500)return res.status(400).json({error:'Myanmar narration text is required (maximum 4,500 characters per request).'});
+  if(req.body?.consent!==true)return res.status(400).json({error:'Confirm that you agree to send this narration text to Azure Speech.'});
   if(voice!=='Nilar'&&voice!=='Thiha')return res.status(400).json({error:'Choose one of the supported Burmese voices.'});
   if(!azureTtsStatus().configured)return res.status(503).json({error:'Myanmar TTS is not configured. Add the Azure Speech F0 key and region to server environment settings.'});
   const result=await synthesizeBurmese(text,voice as BurmeseVoice);
