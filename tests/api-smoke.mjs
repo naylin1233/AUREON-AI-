@@ -27,7 +27,7 @@ async function stop(){
  if(child&&child.exitCode===null){child.kill('SIGTERM');await new Promise(resolve=>child.once('exit',resolve));}
 }
 try{
- await execFileAsync('ffmpeg',['-y','-hide_banner','-loglevel','error','-f','lavfi','-i','color=c=black:s=160x120:d=2','-f','lavfi','-i','sine=frequency=1000:duration=2','-c:v','mpeg4','-c:a','aac','-shortest',sampleVideo]);
+ await execFileAsync('ffmpeg',['-y','-hide_banner','-loglevel','error','-f','lavfi','-i','testsrc2=size=160x120:rate=10','-f','lavfi','-i','sine=frequency=1000','-t','2','-c:v','libx264','-preset','ultrafast','-pix_fmt','yuv420p','-c:a','aac','-shortest','-movflags','+faststart',sampleVideo]);
  await start();
  const health=await (await fetch(base+'/api/health')).json();
  assert.equal(health.ok,true);
