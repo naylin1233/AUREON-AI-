@@ -12,7 +12,7 @@
   - re-enqueues queued/processing jobs after server restart, reuses validated completed chunks, and reprocesses incomplete chunks.
 - Job status endpoint: `GET /api/jobs/:id`.
 - Optional bearer-token API protection via `AUREON_API_TOKEN`.
-- Azure Burmese TTS adapter for Nilar/Thiha standard voices; stays disabled until server-side key and region are configured. No English fallback.
+- Azure Burmese TTS adapter for Nilar/Thiha standard voices; stays disabled until server-side key and region are configured, and requires explicit text-sharing consent per request. No English fallback.
 - Gemini Interactions API adapter for Burmese recap-script drafts from user-provided transcripts; fixed model `gemini-3.8-flash`, disabled until server-side `GEMINI_API_KEY` is configured.
 - Consent-gated Gemini Files API audio transcription for prepared 10-minute WAV chunks; deletes temporary provider files and saves completed transcript chunks for restart/retry recovery.
 - Production frontend static serving from `dist/`.
