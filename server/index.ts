@@ -14,6 +14,7 @@ import { generatePlatformPack } from './ai/platformPack.js';
 import { enqueueTranscriptionJob, resumePendingTranscriptionJobs } from './ai/transcriptionWorker.js';
 import { enqueueRenderJob, resumePendingRenderJobs } from './renderWorker.js';
 import { dailyTopicStatus, discoverReferencesManually, selectDailyTopic, startDailyTopicSelection, startDailyYouTubeReferenceDiscovery, youtubeReferenceDiscoveryStatus } from './youtubeDiscovery.js';
+import { authIsConfigured, validateAuthConfiguration, verifyAdminPassword, createSessionToken, setSessionCookie, clearSessionCookie, adminSessionIsValid, requireAdminSession } from './auth.js';
 
 const execFileAsync=promisify(execFile);
 const app=express();
@@ -23,21 +24,35 @@ const uploadLimitMb=Math.max(1,Number(process.env.AUREON_MAX_UPLOAD_MB||1024));
 const uploadsDir=path.join(storageDirectory(),'uploads');
 const voiceDir=path.join(storageDirectory(),'voice-profiles');
 const dialogueDir=path.join(storageDirectory(),'dialogue-clips');
+validateAuthConfiguration(host);
+const loginFailures=new Map<string,{count:number;resetAt:number}>();
 app.disable('x-powered-by');
 app.use((req,res,next)=>{
  const origin=req.headers.origin;
  if(origin==='http://127.0.0.1:5173'||origin==='http://localhost:5173')res.setHeader('Access-Control-Allow-Origin',origin);
- res.setHeader('Vary','Origin');res.setHeader('Access-Control-Allow-Headers','Content-Type, Authorization');
- res.setHeader('Access-Control-Allow-Methods','GET, POST, OPTIONS');
+ res.setHeader('Vary','Origin');res.setHeader('Access-Control-Allow-Headers','Content-Type');
+ res.setHeader('Access-Control-Allow-Methods','GET, POST, PUT, OPTIONS');
+ res.setHeader('Access-Control-Allow-Credentials','true');
  if(req.method==='OPTIONS')return res.sendStatus(204);
  next();
 });
 app.use(express.json({limit:'1mb'}));
-app.use('/api',(req,res,next)=>{
- const token=process.env.AUREON_API_TOKEN;
- if(token&&req.headers.authorization!==`Bearer ${token}`)return res.status(401).json({error:'Unauthorized'});
- next();
+app.get('/api/health',(_req,res)=>res.json({ok:true,service:'AUREON AI API',version:'0.7.0',features:{projects:true,localUpload:true,durableJsonStore:true,mediaPreparation:true,aiGeneration:geminiStatus().configured,aiScriptGeneration:geminiStatus().configured,audioTranscription:geminiStatus().configured,burmeseTts:azureTtsStatus().configured,videoRendering:true,subtitlePersistence:true,oauthPublishing:false}}));
+app.get('/api/auth/status',(req,res)=>res.setHeader('Cache-Control','no-store').json({configured:authIsConfigured(),authenticated:!authIsConfigured()||adminSessionIsValid(req)}));
+app.post('/api/auth/login',(req,res)=>{
+ const origin=req.get('origin');
+ if(origin){try{if(new URL(origin).host!==req.get('host'))return res.status(403).json({error:'Cross-origin login is not allowed.'});}catch{return res.status(403).json({error:'Invalid request origin.'});}}
+ if(!authIsConfigured())return res.status(409).json({error:'Login is not configured on this server.'});
+ const key=req.ip||'unknown';const now=Date.now();const current=loginFailures.get(key);
+ if(current&&current.resetAt>now&&current.count>=5)return res.status(429).json({error:'Too many login attempts. Try again in 15 minutes.'});
+ if(!verifyAdminPassword(req.body?.password)){
+  const next=current&&current.resetAt>now?{count:current.count+1,resetAt:current.resetAt}:{count:1,resetAt:now+15*60*1000};
+  loginFailures.set(key,next);return res.status(401).json({error:'Password is incorrect.'});
+ }
+ loginFailures.delete(key);setSessionCookie(res,createSessionToken());res.setHeader('Cache-Control','no-store');res.json({authenticated:true});
 });
+app.post('/api/auth/logout',(_req,res)=>{clearSessionCookie(res);res.json({authenticated:false});});
+app.use('/api',requireAdminSession);
 const storage=multer.diskStorage({
  destination:async(_req,_file,cb)=>{try{await mkdir(uploadsDir,{recursive:true});
 await mkdir(voiceDir,{recursive:true});cb(null,uploadsDir)}catch(e){cb(e as Error,uploadsDir)}},
@@ -53,7 +68,6 @@ const voiceUpload=multer({storage:voiceStorage,limits:{fileSize:30*1024*1024,fil
 const dialogueStorage=multer.diskStorage({destination:async(_req,_file,cb)=>{try{await mkdir(dialogueDir,{recursive:true});cb(null,dialogueDir)}catch(e){cb(e as Error,dialogueDir)}},filename:(_req,file,cb)=>{const ext=path.extname(file.originalname).slice(0,10).toLowerCase();cb(null,randomUUID()+ext)}});
 const dialogueUpload=multer({storage:dialogueStorage,limits:{fileSize:30*1024*1024,files:1},fileFilter:(_req,file,cb)=>{const allowed=new Set(['audio/mpeg','audio/mp3','audio/wav','audio/x-wav','audio/mp4','audio/x-m4a','audio/ogg','audio/webm','audio/aac','audio/flac']);if(!allowed.has(file.mimetype))return cb(new Error('Unsupported dialogue audio. Use MP3, WAV, M4A, OGG, WEBM, AAC or FLAC.'));cb(null,true)}});
 const modes=new Set(['Cinematic','Dialogue Breakdown','Narrator Story','Full Deep Dive','Short Viral 60s']);
-app.get('/api/health',(_req,res)=>res.json({ok:true,service:'AUREON AI API',version:'0.7.0',features:{projects:true,localUpload:true,durableJsonStore:true,mediaPreparation:true,aiGeneration:geminiStatus().configured,aiScriptGeneration:geminiStatus().configured,audioTranscription:geminiStatus().configured,burmeseTts:azureTtsStatus().configured,videoRendering:true,subtitlePersistence:true,oauthPublishing:false}}));
 app.get('/api/voices',(_req,res)=>res.json({items:getVoiceProfiles().map(({path:_path,...item})=>({...item,audioUrl:`/api/voices/${item.id}/audio`}))}));
 app.post('/api/voices',voiceUpload.single('audio'),async(req,res,next)=>{
  try{
