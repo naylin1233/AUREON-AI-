@@ -11,7 +11,8 @@
     "preview": "vite preview --host 127.0.0.1",
     "typecheck": "tsc -b",
     "start": "tsx server/index.ts",
-    "typecheck:server": "tsc --noEmit --target ES2022 --module NodeNext --moduleResolution NodeNext --esModuleInterop --skipLibCheck --strict --types node server/index.ts server/store.ts"
+    "typecheck:server": "tsc --noEmit --target ES2022 --module NodeNext --moduleResolution NodeNext --esModuleInterop --skipLibCheck --strict --types node server/index.ts server/store.ts",
+    "test:api": "node tests/api-smoke.mjs"
   },
   "dependencies": {
     "@vitejs/plugin-react": "latest",
