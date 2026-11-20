@@ -43,16 +43,16 @@ app.post('/api/projects',async(req,res,next)=>{
  if(!modes.has(recapMode))return res.status(400).json({error:'Invalid recap mode.'});
  res.status(201).json({item:await addProject({title,recapMode})});}catch(e){next(e)}
 });
-app.get('/api/projects/:id/sources',(req,res)=>{if(!getProject(req.params.id))return res.status(404).json({error:'Project not found.'});res.json({items:getSources(req.params.id)})});
+app.get('/api/projects/:id/sources',(req,res)=>{if(!getProject(String(req.params.id)))return res.status(404).json({error:'Project not found.'});res.json({items:getSources(String(req.params.id))})});
 app.post('/api/projects/:id/upload',upload.single('video'),async(req,res,next)=>{
- try{const project=getProject(req.params.id);if(!project)return res.status(404).json({error:'Project not found.'});
+ try{const project=getProject(String(req.params.id));if(!project)return res.status(404).json({error:'Project not found.'});
  if(!req.file)return res.status(400).json({error:'Select a supported video file.'});
  const item=await addSource({projectId:project.id,kind:'upload',name:req.file.originalname.slice(0,240),path:path.relative(process.cwd(),req.file.path),mimeType:req.file.mimetype,size:req.file.size,status:'stored'});
  res.status(201).json({item,note:'File saved to local storage. AI processing has not started.'});
  }catch(e){next(e)}
 });
 app.post('/api/projects/:id/url-source',async(req,res,next)=>{
- try{const project=getProject(req.params.id);if(!project)return res.status(404).json({error:'Project not found.'});
+ try{const project=getProject(String(req.params.id));if(!project)return res.status(404).json({error:'Project not found.'});
  const raw=typeof req.body?.url==='string'?req.body.url.trim():'';
  let parsed:URL;try{parsed=new URL(raw)}catch{return res.status(400).json({error:'Enter a valid public http(s) URL.'})}
  if(!['http:','https:'].includes(parsed.protocol)||parsed.username||parsed.password||!parsed.hostname||['localhost','127.0.0.1','::1'].includes(parsed.hostname.toLowerCase()))return res.status(400).json({error:'Only public http(s) URLs are accepted.'});
@@ -61,7 +61,7 @@ app.post('/api/projects/:id/url-source',async(req,res,next)=>{
  }catch(e){next(e)}
 });
 app.post('/api/projects/:id/recap-jobs',async(req,res,next)=>{
- try{const project=getProject(req.params.id);if(!project)return res.status(404).json({error:'Project not found.'});
+ try{const project=getProject(String(req.params.id));if(!project)return res.status(404).json({error:'Project not found.'});
  const item=await addJob(project.id);res.status(202).json({item,note:item.note});
  }catch(e){next(e)}
 });
