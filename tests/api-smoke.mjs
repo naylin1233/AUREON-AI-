@@ -66,6 +66,9 @@ try{
  assert.equal(projectResponse.status,201);
  const project=(await projectResponse.json()).item;
  assert.ok(project.id);
+ const badAssignment=await fetch(base+`/api/projects/${project.id}/voice-assignments`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({voiceProfileId:'missing',character:'Hero'})});assert.equal(badAssignment.status,404);
+ const assignmentResponse=await fetch(base+`/api/projects/${project.id}/voice-assignments`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({voiceProfileId:actor.id,character:'Main Hero'})});assert.equal(assignmentResponse.status,201);assert.equal((await assignmentResponse.json()).item.voice.name,'Smoke Actor');
+ const assignmentList=(await (await fetch(base+`/api/projects/${project.id}/voice-assignments`)).json()).items;assert.equal(assignmentList.length,1);assert.equal(assignmentList[0].character,'Main Hero');
 
  const urlResponse=await fetch(base+`/api/projects/${project.id}/url-source`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url:'https://example.com/authorized-video.mp4'})});
  assert.equal(urlResponse.status,201);
@@ -104,6 +107,7 @@ try{
  const voiceList=(await (await fetch(base+'/api/voices')).json()).items;
  assert.equal(voiceList.length,1);assert.equal(voiceList[0].name,'Smoke Actor');
  const persistedAudio=await fetch(base+voiceList[0].audioUrl);assert.equal(persistedAudio.status,200);
+ const persistedAssignments=(await (await fetch(base+`/api/projects/${project.id}/voice-assignments`)).json()).items;assert.equal(persistedAssignments.length,1);assert.equal(persistedAssignments[0].voice.name,'Smoke Actor');
  const persistedJob=(await (await fetch(base+`/api/jobs/${createdJob.id}`)).json()).item;
  assert.equal(persistedJob.status,'media_ready');
  console.log('AUREON API smoke test passed: project persistence, upload, FFmpeg probe, 10-minute audio chunk extraction, job recovery, safe TTS/AI-not-configured behavior transcription consent gate, actor voice upload, consent, audio preview and voice library persistence.');
