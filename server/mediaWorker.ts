@@ -44,7 +44,7 @@ async function processMediaJob(jobId:string){
   const framesDir=path.join(outputDir,'frames');
   await mkdir(framesDir,{recursive:true});
   await run('ffmpeg',['-y','-nostdin','-hide_banner','-loglevel','error','-i',input,'-vf','fps=1/30,scale=480:-2','-q:v','4',path.join(framesDir,'frame-%05d.jpg')]);
-  const frames=(await readdir(framesDir)).filter(name=>/^frame-\\d+\\.jpg$/.test(name)).sort();
+  const frames=(await readdir(framesDir)).filter(name=>/^frame-\d+\.jpg$/.test(name)).sort();
   if(frames.length===0)throw new Error('FFmpeg completed but no sampled reference frames were produced.');
   await updateJob(jobId,{status:'media_ready',stage:'media_preparation_complete',progress:100,chunkCount:chunks.length,frameCount:frames.length,outputDir:path.relative(process.cwd(),outputDir),note:`Media preparation complete: ${chunks.length} audio chunk(s) and ${frames.length} sampled reference frame(s). These are review assets, not AI scene analysis. Burmese TTS and final video rendering have not started.`});
  }catch(error){
