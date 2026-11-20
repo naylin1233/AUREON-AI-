@@ -10,6 +10,7 @@ const dataDir=await mkdtemp(path.join(os.tmpdir(),'aureon-api-test-'));
 const port=Number(process.env.AUREON_TEST_PORT||8879);
 const base=`http://127.0.0.1:${port}`;
 const sampleVideo=path.join(dataDir,'smoke-test.mp4');
+const sampleVoice=path.join(dataDir,'actor-sample.wav');
 let child;
 async function start(){
  child=spawn(process.execPath,['--import','tsx','server/index.ts'],{
@@ -28,6 +29,7 @@ async function stop(){
 }
 try{
  await execFileAsync('ffmpeg',['-y','-hide_banner','-loglevel','error','-f','lavfi','-i','color=c=black:s=160x120:d=2','-f','lavfi','-i','sine=frequency=1000:duration=2','-c:v','mpeg4','-c:a','aac','-shortest',sampleVideo]);
+ await execFileAsync('ffmpeg',['-y','-hide_banner','-loglevel','error','-f','lavfi','-i','sine=frequency=440:duration=1','-c:a','pcm_s16le',sampleVoice]);
  await start();
  const health=await (await fetch(base+'/api/health')).json();
  assert.equal(health.ok,true);
@@ -51,6 +53,12 @@ try{
  assert.equal(ttsNoConsent.status,400);
  const ttsUnavailable=await fetch(base+'/api/tts/synthesize',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:'မင်္ဂလာပါ',voice:'Nilar',consent:true})});
  assert.equal(ttsUnavailable.status,503);
+ const actorForm=new FormData();actorForm.append('name','Smoke Actor');actorForm.append('character','Test Hero');actorForm.append('consent','true');actorForm.append('audio',new Blob([await readFile(sampleVoice)],{type:'audio/wav'}),'actor.wav');
+ const actorResponse=await fetch(base+'/api/voices',{method:'POST',body:actorForm});
+ assert.equal(actorResponse.status,201);
+ const actor=(await actorResponse.json()).item;
+ assert.equal(actor.name,'Smoke Actor');assert.equal(actor.character,'Test Hero');assert.equal(actor.language,'my-MM');
+ const actorAudio=await fetch(base+actor.audioUrl);assert.equal(actorAudio.status,200);assert.ok(Number(actorAudio.headers.get('content-length'))>100);
 
  const projectResponse=await fetch(base+'/api/projects',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({title:'Smoke Test Project',recapMode:'Cinematic'})});
  assert.equal(projectResponse.status,201);
@@ -91,9 +99,12 @@ try{
  const persisted=await (await fetch(base+'/api/projects')).json();
  assert.equal(persisted.items.length,1);
  assert.equal(persisted.items[0].title,'Smoke Test Project');
+ const voiceList=(await (await fetch(base+'/api/voices')).json()).items;
+ assert.equal(voiceList.length,1);assert.equal(voiceList[0].name,'Smoke Actor');
+ const persistedAudio=await fetch(base+voiceList[0].audioUrl);assert.equal(persistedAudio.status,200);
  const persistedJob=(await (await fetch(base+`/api/jobs/${createdJob.id}`)).json()).item;
  assert.equal(persistedJob.status,'media_ready');
- console.log('AUREON API smoke test passed: project persistence, upload, FFmpeg probe, 10-minute audio chunk extraction, job recovery, safe TTS/AI-not-configured behavior and transcription consent gate.');
+ console.log('AUREON API smoke test passed: project persistence, upload, FFmpeg probe, 10-minute audio chunk extraction, job recovery, safe TTS/AI-not-configured behavior transcription consent gate, actor voice upload, consent, audio preview and voice library persistence.');
 }finally{
  await stop();
  await rm(dataDir,{recursive:true,force:true});
