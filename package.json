@@ -14,7 +14,7 @@
     "typecheck:server": "tsc --ignoreConfig --noEmit --target ES2022 --module NodeNext --moduleResolution NodeNext --esModuleInterop --skipLibCheck --strict --types node server/index.ts server/store.ts",
     "test:api": "node tests/api-smoke.mjs",
     "test:subtitles": "node --import tsx tests/subtitles-smoke.mjs",
-    "test:unit": "node --import tsx --test tests/subtitles.test.ts",
+    "test:unit": "node --import tsx --test tests/subtitles.test.ts tests/transcribe.test.ts",
     "test": "npm run test:unit && npm run test:api"
   },
   "dependencies": {
