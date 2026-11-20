@@ -3,6 +3,7 @@ import type { NextFunction, Request, Response } from 'express';
 
 export const sessionCookieName = 'aureon_session';
 const sessionLifetimeSeconds = 60 * 60 * 24 * 7;
+const revokedSessions = new Set<string>();
 
 export function authIsConfigured() {
   return Boolean(process.env.AUREON_ADMIN_PASSWORD);
@@ -42,7 +43,7 @@ export function createSessionToken(now = Date.now()) {
 }
 
 export function verifySessionToken(token: string | undefined, now = Date.now()) {
-  if (!token || !authIsConfigured()) return false;
+  if (!token || !authIsConfigured() || revokedSessions.has(token)) return false;
   const parts = token.split('.');
   if (parts.length !== 2) return false;
   const [payload, suppliedSignature] = parts;
@@ -78,6 +79,11 @@ export function clearSessionCookie(res: Response) {
 
 export function adminSessionIsValid(req: Request) {
   return verifySessionToken(readCookie(req, sessionCookieName));
+}
+
+export function revokeAdminSession(req: Request) {
+  const token = readCookie(req, sessionCookieName);
+  if (token) revokedSessions.add(token);
 }
 
 export function requestOriginIsAllowed(req: Request) {
