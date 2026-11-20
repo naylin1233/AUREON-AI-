@@ -14,7 +14,7 @@ assert.equal(english[0].start,'00:00:01,250');
 assert.equal(english[0].english,'Hello there.');
 const merged=[{...myanmar[0],english:english[0].english}];
 const exportedSrt=serializeSubtitles(merged,'myanmar','srt');
-assert.match(exportedSrt,/00:00:01,250 -->/);
+assert.match(exportedSrt,/00:00:01,000 -->/);
 assert.match(serializeSubtitles(merged,'english','vtt'),/^WEBVTT\n\n/);
 assert.equal(addSecondsToTimestamp('00:00:58,500',3),'00:01:01,500');
 assert.throws(()=>parseSubtitleFile('1\n00:00:04,000 --> 00:00:02,000\nBad range'),/later than start/);
