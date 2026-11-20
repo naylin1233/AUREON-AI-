@@ -3,7 +3,7 @@ import multer from 'multer';
 import { randomUUID } from 'node:crypto';
 import { mkdir } from 'node:fs/promises';
 import path from 'node:path';
-import { addJob, addProject, addSource, getJobs, getProjects, getProject, getSources, getJob, updateJob, initializeStore, storageDirectory } from './store.js';
+import { addJob, addProject, addSource, getJobs, getProjects, getProject, getSources, getJob, updateJob, getVoiceProfiles, getVoiceProfile, addVoiceProfile, initializeStore, storageDirectory } from './store.js';
 import { enqueueMediaJob, resumePendingMediaJobs } from './mediaWorker.js';
 import { azureTtsStatus, synthesizeBurmese, type BurmeseVoice } from './tts/azureSpeech.js';
 import { geminiStatus, generateBurmeseRecap } from './ai/gemini.js';
@@ -14,6 +14,7 @@ const port=Number(process.env.PORT||8787);
 const host=process.env.HOST||'127.0.0.1';
 const uploadLimitMb=Math.max(1,Number(process.env.AUREON_MAX_UPLOAD_MB||1024));
 const uploadsDir=path.join(storageDirectory(),'uploads');
+const voiceDir=path.join(storageDirectory(),'voice-profiles');
 app.disable('x-powered-by');
 app.use((req,res,next)=>{
  const origin=req.headers.origin;
@@ -30,7 +31,8 @@ app.use('/api',(req,res,next)=>{
  next();
 });
 const storage=multer.diskStorage({
- destination:async(_req,_file,cb)=>{try{await mkdir(uploadsDir,{recursive:true});cb(null,uploadsDir)}catch(e){cb(e as Error,uploadsDir)}},
+ destination:async(_req,_file,cb)=>{try{await mkdir(uploadsDir,{recursive:true});
+await mkdir(voiceDir,{recursive:true});cb(null,uploadsDir)}catch(e){cb(e as Error,uploadsDir)}},
  filename:(_req,file,cb)=>{const ext=path.extname(file.originalname).slice(0,12).toLowerCase();cb(null,`${randomUUID()}${ext}`)}
 });
 const upload=multer({storage,limits:{fileSize:uploadLimitMb*1024*1024,files:1},fileFilter:(_req,file,cb)=>{
@@ -38,8 +40,28 @@ const upload=multer({storage,limits:{fileSize:uploadLimitMb*1024*1024,files:1},f
  if(!allowed.has(file.mimetype))return cb(new Error('Unsupported video type. Allowed: MP4, MOV, MKV, WEBM, AVI, MPEG.'));
  cb(null,true);
 }});
+const voiceStorage=multer.diskStorage({destination:async(_req,_file,cb)=>{try{await mkdir(voiceDir,{recursive:true});cb(null,voiceDir)}catch(e){cb(e as Error,voiceDir)}},filename:(_req,file,cb)=>{const ext=path.extname(file.originalname).slice(0,10).toLowerCase();cb(null,randomUUID()+ext)}});
+const voiceUpload=multer({storage:voiceStorage,limits:{fileSize:30*1024*1024,files:1},fileFilter:(_req,file,cb)=>{const allowed=new Set(['audio/mpeg','audio/mp3','audio/wav','audio/x-wav','audio/mp4','audio/x-m4a','audio/ogg','audio/webm','audio/aac','audio/flac']);if(!allowed.has(file.mimetype))return cb(new Error('Unsupported actor audio. Use MP3, WAV, M4A, OGG, WEBM, AAC or FLAC.'));cb(null,true)}});
 const modes=new Set(['Cinematic','Dialogue Breakdown','Narrator Story','Full Deep Dive','Short Viral 60s']);
 app.get('/api/health',(_req,res)=>res.json({ok:true,service:'AUREON AI API',version:'0.7.0',features:{projects:true,localUpload:true,durableJsonStore:true,mediaPreparation:true,aiGeneration:geminiStatus().configured,aiScriptGeneration:geminiStatus().configured,audioTranscription:geminiStatus().configured,burmeseTts:azureTtsStatus().configured,videoRendering:false,oauthPublishing:false}}));
+app.get('/api/voices',(_req,res)=>res.json({items:getVoiceProfiles().map(({path:_path,...item})=>({...item,audioUrl:`/api/voices/${item.id}/audio`}))}));
+app.post('/api/voices',voiceUpload.single('audio'),async(req,res,next)=>{
+ try{
+  const name=typeof req.body?.name==='string'?req.body.name.trim():'';
+  const character=typeof req.body?.character==='string'?req.body.character.trim():'';
+  if(!name||name.length>60)return res.status(400).json({error:'Voice profile name is required (maximum 60 characters).'});
+  if(!character||character.length>60)return res.status(400).json({error:'Character or role name is required (maximum 60 characters).'});
+  if(req.body?.consent!=='true')return res.status(400).json({error:'Confirm that you own this recording or have the voice actor’s permission.'});
+  if(!req.file)return res.status(400).json({error:'Select an actor voice recording first.'});
+  const item=await addVoiceProfile({name,character,language:'my-MM',fileName:req.file.originalname.slice(0,180),path:path.relative(process.cwd(),req.file.path),mimeType:req.file.mimetype,size:req.file.size,consentConfirmed:true});
+  res.status(201).json({item:{...item,path:undefined,audioUrl:`/api/voices/${item.id}/audio`},note:'Voice sample saved as a recorded actor reference. It is not a cloned or generated voice.'});
+ }catch(e){next(e)}
+});
+app.get('/api/voices/:id/audio',(req,res)=>{
+ const id=String(req.params.id);if(!/^[0-9a-f-]{36}$/i.test(id))return res.status(400).json({error:'Invalid voice profile id.'});
+ const item=getVoiceProfile(id);if(!item)return res.status(404).json({error:'Voice recording not found.'});
+ res.type(item.mimeType).sendFile(path.resolve(process.cwd(),item.path),error=>{if(error&&!res.headersSent)res.status(404).json({error:'Voice recording file not found.'});});
+});
 app.get('/api/tts/status',(_req,res)=>res.json(azureTtsStatus()));
 app.get('/api/ai/status',(_req,res)=>res.json(geminiStatus()));
 app.post('/api/ai/recap-script',async(req,res,next)=>{
@@ -122,7 +144,7 @@ app.use(express.static(path.resolve(process.cwd(),'dist')));
 app.use((error:unknown,_req:Request,res:Response,_next:NextFunction)=>{
  const err=error as Error & {code?:string};
  if(err instanceof multer.MulterError)return res.status(err.code==='LIMIT_FILE_SIZE'?413:400).json({error:err.code==='LIMIT_FILE_SIZE'?`File exceeds ${uploadLimitMb} MB upload limit.`:err.message});
- if(err.message.startsWith('Unsupported video type'))return res.status(415).json({error:err.message});
+ if(err.message.startsWith('Unsupported video type')||err.message.startsWith('Unsupported actor audio'))return res.status(415).json({error:err.message});
  if(err.message.startsWith('AI recap is not configured'))return res.status(503).json({error:err.message});
  if(err.message.startsWith('Gemini request failed')||err.message.startsWith('Gemini transcription failed'))return res.status(502).json({error:err.message});
  if(err.message.startsWith('Myanmar TTS is not configured'))return res.status(503).json({error:err.message});
