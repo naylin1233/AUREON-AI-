@@ -17,7 +17,7 @@ Responsive Burmese-first React + TypeScript + Vite dashboard with five recap mod
 - FFmpeg/FFprobe validates uploaded video duration and audio stream.
 - Extracts mono 16 kHz WAV audio into 10-minute chunks, supporting long source videos.
 - Stores job status, progress, output path, chunk count and failure details.
-- Resumes queued/processing jobs after server restart.
+- Re-enqueues queued/processing jobs after server restart (re-extracts from the beginning; per-chunk checkpoint resume is not yet implemented).
 - Docker runtime includes FFmpeg and a persistent data volume.
 
 ## Run locally
