@@ -1,0 +1,78 @@
+import assert from 'node:assert/strict';
+import { spawn, execFile } from 'node:child_process';
+import { promisify } from 'node:util';
+import { mkdtemp, rm, readFile } from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
+
+const execFileAsync=promisify(execFile);
+const dataDir=await mkdtemp(path.join(os.tmpdir(),'aureon-api-test-'));
+const port=Number(process.env.AUREON_TEST_PORT||8879);
+const base=`http://127.0.0.1:${port}`;
+const sampleVideo=path.join(dataDir,'smoke-test.mp4');
+let child;
+async function start(){
+ child=spawn(process.execPath,['--import','tsx','server/index.ts'],{
+  env:{...process.env,HOST:'127.0.0.1',PORT:String(port),AUREON_DATA_DIR:dataDir,AUREON_MAX_UPLOAD_MB:'8'},
+  stdio:'ignore'
+ });
+ for(let i=0;i<80;i++){
+  if(child.exitCode!==null)throw new Error('API process exited before startup');
+  try{const response=await fetch(base+'/api/health');if(response.ok)return;}catch{}
+  await new Promise(resolve=>setTimeout(resolve,150));
+ }
+ throw new Error('API did not become healthy within 12 seconds');
+}
+async function stop(){
+ if(child&&child.exitCode===null){child.kill('SIGTERM');await new Promise(resolve=>child.once('exit',resolve));}
+}
+try{
+ await execFileAsync('ffmpeg',['-y','-hide_banner','-loglevel','error','-f','lavfi','-i','color=c=black:s=160x120:d=2','-f','lavfi','-i','sine=frequency=1000:duration=2','-c:v','mpeg4','-c:a','aac','-shortest',sampleVideo]);
+ await start();
+ const health=await (await fetch(base+'/api/health')).json();
+ assert.equal(health.ok,true);
+ assert.equal(health.features.mediaPreparation,true);
+ assert.equal(health.features.aiGeneration,false);
+
+ const projectResponse=await fetch(base+'/api/projects',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({title:'Smoke Test Project',recapMode:'Cinematic'})});
+ assert.equal(projectResponse.status,201);
+ const project=(await projectResponse.json()).item;
+ assert.ok(project.id);
+
+ const urlResponse=await fetch(base+`/api/projects/${project.id}/url-source`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url:'https://example.com/authorized-video.mp4'})});
+ assert.equal(urlResponse.status,201);
+ assert.equal((await urlResponse.json()).item.status,'awaiting_review');
+
+ const form=new FormData();
+ form.append('video',new Blob([await readFile(sampleVideo)],{type:'video/mp4'}),'sample.mp4');
+ const uploadResponse=await fetch(base+`/api/projects/${project.id}/upload`,{method:'POST',body:form});
+ assert.equal(uploadResponse.status,201);
+ assert.equal((await uploadResponse.json()).item.status,'stored');
+
+ const jobResponse=await fetch(base+`/api/projects/${project.id}/recap-jobs`,{method:'POST'});
+ assert.equal(jobResponse.status,202);
+ const createdJob=(await jobResponse.json()).item;
+ assert.equal(createdJob.status,'queued');
+ let finalJob;
+ for(let i=0;i<100;i++){
+  const response=await fetch(base+`/api/jobs/${createdJob.id}`);
+  finalJob=(await response.json()).item;
+  if(finalJob.status==='media_ready'||finalJob.status==='failed')break;
+  await new Promise(resolve=>setTimeout(resolve,150));
+ }
+ assert.equal(finalJob.status,'media_ready',finalJob.error||'Media worker did not complete.');
+ assert.equal(finalJob.chunkCount,1);
+ assert.ok(finalJob.outputDir);
+
+ await stop();
+ await start();
+ const persisted=await (await fetch(base+'/api/projects')).json();
+ assert.equal(persisted.items.length,1);
+ assert.equal(persisted.items[0].title,'Smoke Test Project');
+ const persistedJob=(await (await fetch(base+`/api/jobs/${createdJob.id}`)).json()).item;
+ assert.equal(persistedJob.status,'media_ready');
+ console.log('AUREON API smoke test passed: project persistence, upload, FFmpeg probe, 10-minute audio chunk extraction, job recovery.');
+}finally{
+ await stop();
+ await rm(dataDir,{recursive:true,force:true});
+}

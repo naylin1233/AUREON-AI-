@@ -1,0 +1,88 @@
+import { useEffect, useState } from 'react';
+import type { ComponentType } from 'react';
+import { Activity, AudioLines, Clapperboard, Clock3, FileVideo, Film, Globe2, LayoutDashboard, Menu, Settings, ShieldCheck, Subtitles, PlayCircle, Users, Video, Plus, ChevronRight, Sparkles, Languages, CloudUpload, X, CircleAlert, CircleCheck } from 'lucide-react';
+import { api, type Job, type Project, type Source } from './api';
+
+type Section = 'overview'|'recap'|'library'|'captions'|'voice'|'automation'|'settings';
+type IconType = ComponentType<{size?: number}>;
+const nav: {id:Section;label:string;icon:IconType}[] = [
+ {id:'overview',label:'ခြုံငုံသုံးသပ်ချက်',icon:LayoutDashboard},
+ {id:'recap',label:'Donghua Recap Studio',icon:Clapperboard},
+ {id:'library',label:'Video Library',icon:Film},
+ {id:'captions',label:'Subtitle Studio',icon:Subtitles},
+ {id:'voice',label:'Myanmar Voice Studio',icon:AudioLines},
+ {id:'automation',label:'Auto Publishing',icon:Clock3},
+ {id:'settings',label:'Settings',icon:Settings}
+];
+export default function App(){
+ const [section,setSection]=useState<Section>('overview');
+ const [mobileOpen,setMobileOpen]=useState(false);
+ const [notice,setNotice]=useState('');
+ const [url,setUrl]=useState('');
+ const [mode,setMode]=useState('Cinematic');
+ const [projectTitle,setProjectTitle]=useState('My Donghua Recap');
+ const [file,setFile]=useState<File|null>(null);
+ const [projects,setProjects]=useState<Project[]>([]);
+ const [activeProjectId,setActiveProjectId]=useState('');
+ const [sources,setSources]=useState<Source[]>([]);
+ const [lastJob,setLastJob]=useState<Job|null>(null);
+ const [apiOnline,setApiOnline]=useState(false);
+ const [busy,setBusy]=useState(false);
+ const title=nav.find(x=>x.id===section)?.label??'Dashboard';
+ const refreshProjects=async()=>{const result=await api.projects();setProjects(result.items);return result.items;};
+ const refreshSources=async(id:string)=>{if(!id){setSources([]);return;}const result=await api.sources(id);setSources(result.items);};
+ useEffect(()=>{let alive=true;(async()=>{try{await api.health();const result=await api.projects();if(!alive)return;setApiOnline(true);setProjects(result.items);if(result.items[0]){setActiveProjectId(result.items[0].id);const sourceResult=await api.sources(result.items[0].id);if(alive)setSources(sourceResult.items);}}catch{if(alive)setApiOnline(false);}})();return()=>{alive=false};},[]);
+ const selectProject=async(id:string)=>{setActiveProjectId(id);setLastJob(null);try{await refreshSources(id)}catch(e){setNotice((e as Error).message)}};
+ const monitorJob=async(id:string)=>{for(let i=0;i<120;i++){await new Promise(resolve=>setTimeout(resolve,1000));try{const result=await api.job(id);setLastJob(result.item);if(['media_ready','failed'].includes(result.item.status))return;}catch{return;}}};
+ const createProject=async()=>{setBusy(true);try{const result=await api.createProject(projectTitle,mode);setActiveProjectId(result.item.id);await refreshProjects();setSources([]);setNotice('Project ကို Local Storage ထဲ သိမ်းပြီးပါပြီ။');return result.item.id;}catch(e){setNotice((e as Error).message);return '';}finally{setBusy(false)}};
+ const prepareRecap=async()=>{
+  setBusy(true);try{
+   let projectId=activeProjectId;
+   if(!projectId){const created=await api.createProject(projectTitle,mode);projectId=created.item.id;setActiveProjectId(projectId);await refreshProjects();}
+   let saved=false;let uploaded=false;
+   if(file){await api.upload(projectId,file);saved=true;uploaded=true;setFile(null);}
+   if(url.trim()){await api.addUrl(projectId,url.trim());saved=true;setUrl('');}
+   if(!saved){setNotice('Video ဖိုင် သို့မဟုတ် Authorized URL တစ်ခု ထည့်ပါ။');return;}
+   await refreshSources(projectId);
+   if(!uploaded){setNotice('URL ကို review အတွက်သာ သိမ်းထားပါတယ်။ Media Processing အတွက် Video ကို upload လုပ်ပါ။');return;}
+   const job=await api.createJob(projectId);setLastJob(job.item);
+   setNotice('Media Preparation Job ကို စတင်လိုက်ပါပြီ။ အခြေအနေကို ဒီစာမျက်နှာမှာ ကြည့်နိုင်ပါတယ်.');
+   void monitorJob(job.item.id);
+  }catch(e){setNotice((e as Error).message)}finally{setBusy(false)}
+ };
+ const totalAssets=projects.reduce((sum,p)=>sum+p.sourceIds.length,0);
+ return <div className="shell">
+  <aside className={mobileOpen?'sidebar open':'sidebar'}>
+   <div className="brand"><div className="brand-mark">A</div><div><b>AUREON <span>AI</span></b><small>PREMIUM GOLD EDITION</small></div><button className="close-menu" onClick={()=>setMobileOpen(false)} aria-label="Close menu"><X size={18}/></button></div>
+   <div className="nav-label">MEDIA WORKSPACE</div>
+   <nav>{nav.map(item=>{const I=item.icon;return <button key={item.id} className={section===item.id?'nav-item active':'nav-item'} onClick={()=>{setSection(item.id);setMobileOpen(false)}}><I size={18}/><span>{item.label}</span></button>})}</nav>
+   <div className="sidebar-bottom"><div className="plan"><Sparkles size={17}/><b>Gold Studio</b><p>ဖန်တီးမှုအားလုံးကို တစ်နေရာတည်းမှာ စီမံပါ။</p><small>MEDIA ENGINE · 0.3.0</small></div><div className="profile"><div className="avatar">A</div><div><b>Studio Owner</b><small>Local workspace</small></div></div></div>
+  </aside>
+  {mobileOpen&&<button className="scrim" onClick={()=>setMobileOpen(false)} aria-label="Close navigation"/>}
+  <main className="main">
+   <header className="topbar"><div className="crumb"><button className="menu-button" onClick={()=>setMobileOpen(true)} aria-label="Open menu"><Menu/></button>AUREON AI <ChevronRight size={14}/><b>{title}</b></div><span className={apiOnline?'system-status':'system-status offline'}>{apiOnline?'● API CONNECTED':'○ API OFFLINE'}</span></header>
+   <div className="content">
+    <div className="welcome"><div><div className="eyebrow"><Sparkles size={14}/> YOUR WORLD. YOUR AI.</div><h1>{section==='overview'?'မင်္ဂလာပါ၊ AUREON Studio မှ ကြိုဆိုပါတယ်။':title}</h1><p>{section==='overview'?'သင့်ရဲ့ AI Media Production ကို တစ်နေရာတည်းမှာ စီမံခန့်ခွဲလိုက်ပါ။':'Media Production လုပ်ငန်းစဉ်များကို စီမံနိုင်ပါတယ်။'}</p></div><button className="gold-button" onClick={()=>setSection('recap')}><Plus size={17}/> New Recap Project</button></div>
+    {section==='overview'?<Overview setSection={setSection} projectCount={projects.length} assetCount={totalAssets} apiOnline={apiOnline}/>:<section className="panel">
+      <div className="panel-heading"><Sparkles size={18}/><b>{title}</b><span className={apiOnline?'pill':'pill warning'}>{apiOnline?'API CONNECTED':'API OFFLINE'}</span></div>
+      {section==='recap'&&<><p className="muted">သင်ပိုင်ဆိုင်သော သို့မဟုတ် အသုံးပြုခွင့်ရှိသော Video များကိုသာ ထည့်သွင်းပါ။ File များကို သင့်ရဲ့ Local Storage ထဲ သိမ်းဆည်းပါမယ်။</p><div className="form-grid"><label>Project Name<input value={projectTitle} onChange={e=>setProjectTitle(e.target.value)} maxLength={120}/></label><label>Recap Mode<select value={mode} onChange={e=>setMode(e.target.value)}>{['Cinematic','Dialogue Breakdown','Narrator Story','Full Deep Dive','Short Viral 60s'].map(x=><option key={x}>{x}</option>)}</select></label></div><div className="form-grid"><label>Existing Project<select value={activeProjectId} onChange={e=>selectProject(e.target.value)}><option value="">Create a new project</option>{projects.map(p=><option key={p.id} value={p.id}>{p.title}</option>)}</select></label><label>Authorized Video URL<input value={url} onChange={e=>setUrl(e.target.value)} placeholder="https://... (metadata only)"/></label></div><label className="upload"><CloudUpload size={28}/><b>{file?.name||'Video ဖိုင်ရွေးချယ်ရန်'}</b><small>MP4, MOV, MKV, WEBM, AVI · Max upload 1024 MB</small><input type="file" accept="video/mp4,video/quicktime,video/x-matroska,video/webm,video/x-msvideo,video/mpeg" onChange={e=>setFile(e.target.files?.[0]??null)}/></label><div className="button-row"><button className="gold-button" disabled={busy||!apiOnline} onClick={createProject}><Plus size={16}/> Create Project</button><button className="gold-button" disabled={busy||!apiOnline} onClick={prepareRecap}>{busy?'Saving...':'Save Source & Create Job'} <ChevronRight size={16}/></button></div><p className="muted">Upload လုပ်ထားသော Video ကို FFmpeg ဖြင့် Audio Chunk များအဖြစ် ခွဲထုတ်ပါမယ်။ AI Script, Myanmar TTS နှင့် Final Video Rendering ကို သီးခြားတည်ဆောက်ရပါမယ်။</p>{lastJob&&<div className="job-card"><div className="job-top"><b>Media Preparation</b><span className={'job-state '+lastJob.status}>{lastJob.status.replaceAll('_',' ').toUpperCase()}</span></div><div className="job-progress"><div style={{width:lastJob.progress+'%'}}/></div><div className="job-meta"><span>{lastJob.stage}</span><b>{lastJob.progress}%</b></div><p>{lastJob.note}</p>{lastJob.error&&<p className="job-error">{lastJob.error}</p>}{lastJob.chunkCount&&<small>{lastJob.chunkCount} audio chunk(s) · {Math.round((lastJob.durationSeconds||0)/60)} minutes</small>}</div>}</>}
+      {section==='library'&&<><div className="form-grid"><label>Project<select value={activeProjectId} onChange={e=>selectProject(e.target.value)}><option value="">Select project</option>{projects.map(p=><option key={p.id} value={p.id}>{p.title}</option>)}</select></label></div>{sources.length===0?<Empty icon={Film} title="Video Library အလွတ်ဖြစ်နေပါတယ်" text="Project တစ်ခုရွေးပြီး Video upload လုပ်ပါ။"/>:<div className="source-list">{sources.map(s=><div className="source-row" key={s.id}><FileVideo size={20}/><div><b>{s.name}</b><small>{s.kind.toUpperCase()} · {s.status}{s.size?' · '+(s.size/1024/1024).toFixed(1)+' MB':''}</small></div></div>)}</div>}</>}
+      {section==='captions'&&<Empty icon={Languages} title="Subtitle Engine မချိတ်ဆက်ရသေးပါ" text="Myanmar + English subtitle generation, timing နှင့် SRT/VTT export ကို နောက်အဆင့်မှာ တည်ဆောက်ပါမယ်။"/>}
+      {section==='voice'&&<><Empty icon={AudioLines} title="Myanmar Voice Engine မချိတ်ဆက်ရသေးပါ" text="မြန်မာအသံ အမှန်တကယ် ထုတ်ပေးနိုင်သော provider ကို စမ်းသပ်အတည်ပြုပြီးမှ ဖွင့်ပါမယ်။ English fallback မသုံးပါ။"/><p className="muted">TTS status: Not configured — no sample audio is fabricated.</p></>}
+      {section==='automation'&&<><div className="platforms"><Platform icon={PlayCircle} name="YouTube"/><Platform icon={Users} name="Facebook"/><Platform icon={Video} name="TikTok"/></div><div className="form-grid"><label>Daily start time<input type="time" defaultValue="06:00"/></label><label>Timezone<select defaultValue="Asia/Bangkok"><option>Asia/Bangkok</option></select></label></div><Empty icon={ShieldCheck} title="OAuth ချိတ်ဆက်မှု မရှိသေးပါ" text="Platform ခွင့်ပြုချက်ရပြီး preview/review ပြီးမှသာ publish လုပ်နိုင်မည်ဖြစ်သည်။"/></>}
+      {section==='settings'&&<><div className="setting-row"><span>Theme</span><b>Premium Gold Edition</b></div><div className="setting-row"><span>Language</span><b>မြန်မာ / English</b></div><div className="setting-row"><span>Default timezone</span><b>Asia/Bangkok</b></div><div className="setting-row"><span>Paid services</span><b className="good">Disabled by default</b></div><div className="setting-row"><span>Backend API</span><b className={apiOnline?'good':'warning-text'}>{apiOnline?'Connected':'Offline'}</b></div></>}
+    </section>}
+    <footer>© 2026 AUREON AI <span>Premium Gold Edition</span><small>Stage 3 · Media preparation</small></footer>
+   </div>
+  </main>
+  {notice&&<div className="toast"><CircleAlert size={17}/>{notice}<button onClick={()=>setNotice('')} aria-label="Dismiss">×</button></div>}
+ </div>
+}
+function Overview({setSection,projectCount,assetCount,apiOnline}:{setSection:(s:Section)=>void;projectCount:number;assetCount:number;apiOnline:boolean}){
+ const stats=[{label:'Projects',value:String(projectCount),desc:'Local database ထဲရှိ Project များ',icon:Clapperboard},{label:'Video Assets',value:String(assetCount),desc:'သိမ်းဆည်းထားသော Source များ',icon:FileVideo},{label:'Narration',value:'Not configured',desc:'Myanmar voice setup လိုအပ်သည်',icon:AudioLines},{label:'Scheduled Posts',value:'0',desc:'Publishing မချိတ်ဆက်ရသေးပါ',icon:Clock3}];
+ const actions=[{title:'Donghua Recap Studio',desc:'Video source ထည့်သွင်းပြီး Project မှတ်တမ်းတင်ရန်။',icon:Clapperboard,to:'recap' as Section,button:'Open Studio'},{title:'Subtitle Studio',desc:'Myanmar + English Subtitle နှင့် SRT Export အတွက်။',icon:Subtitles,to:'captions' as Section,button:'Manage subtitles'},{title:'Myanmar Voice Studio',desc:'မြန်မာ Narration အသံရင်းမြစ်ကို စီစဉ်သတ်မှတ်ရန်။',icon:AudioLines,to:'voice' as Section,button:'Configure voice'},{title:'Auto Publishing',desc:'YouTube, Facebook, TikTok Schedule နှင့် OAuth ချိတ်ရန်။',icon:Globe2,to:'automation' as Section,button:'Setup automation'}];
+ return <><div className="stats">{stats.map(s=>{const I=s.icon;return <div className="stat-card" key={s.label}><div className="stat-top"><span>{s.label}</span><I size={19}/></div><strong className={s.value==='Not configured'?'small-value':''}>{s.value}</strong><small>{s.desc}</small></div>})}</div><div className="section-heading"><div><h2>Production Workspace</h2><p>သင့်ရဲ့ အဓိကလုပ်ငန်းစဉ်များ</p></div><span className={apiOnline?'pill':'pill warning'}>{apiOnline?'BACKEND CONNECTED':'BACKEND OFFLINE'}</span></div><div className="action-grid">{actions.map(a=>{const I=a.icon;return <article className="action-card" key={a.to}><I size={22}/><h3>{a.title}</h3><p>{a.desc}</p><button onClick={()=>setSection(a.to)}>{a.button} <ChevronRight size={15}/></button></article>})}</div><div className="bottom-grid"><div className="panel"><div className="panel-heading"><Activity size={18}/><b>System Readiness</b><span className="pill warning">SETUP REQUIRED</span></div><Readiness label="Projects & local media API" value={apiOnline?'Connected':'Offline'} done={apiOnline}/><Readiness label="Myanmar TTS engine" value="Not configured"/><Readiness label="Video rendering pipeline" value="Not configured"/><Readiness label="Social platform OAuth" value="Not connected"/></div><div className="panel"><div className="panel-heading"><ShieldCheck size={18}/><b>Usage & Safety</b></div><p className="safety"><CircleCheck size={16}/> Free-tier-first configuration</p><p className="safety"><CircleCheck size={16}/> No paid billing enabled</p><p className="safety"><CircleCheck size={16}/> Authorized content only</p><p className="muted">AI generation နှင့် publishing ကို အမှန်တကယ် စမ်းသပ်အောင်မြင်မှသာ အသုံးပြုနိုင်ကြောင်း ပြသပါမည်။</p></div></div></>
+}
+function Readiness({label,value,done}:{label:string;value:string;done?:boolean}){return <div className="readiness"><span>{label}</span><small className={done?'good':''}>{done?'●':'○'} {value}</small></div>}
+function Empty({icon:Icon,title,text}:{icon:IconType;title:string;text:string}){return <div className="empty"><Icon size={28}/><h3>{title}</h3><p>{text}</p></div>}
+function Platform({icon:Icon,name}:{icon:IconType;name:string}){return <div className="platform"><Icon size={21}/><b>{name}</b><small>Not connected</small></div>}
