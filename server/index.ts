@@ -14,7 +14,7 @@ import { generatePlatformPack } from './ai/platformPack.js';
 import { enqueueTranscriptionJob, resumePendingTranscriptionJobs } from './ai/transcriptionWorker.js';
 import { enqueueRenderJob, resumePendingRenderJobs } from './renderWorker.js';
 import { dailyTopicStatus, discoverReferencesManually, selectDailyTopic, startDailyTopicSelection, startDailyYouTubeReferenceDiscovery, youtubeReferenceDiscoveryStatus } from './youtubeDiscovery.js';
-import { authIsConfigured, validateAuthConfiguration, verifyAdminPassword, createSessionToken, setSessionCookie, clearSessionCookie, adminSessionIsValid, requestOriginIsAllowed, requireAdminSession } from './auth.js';
+import { authIsConfigured, validateAuthConfiguration, verifyAdminPassword, createSessionToken, setSessionCookie, clearSessionCookie, adminSessionIsValid, revokeAdminSession, requestOriginIsAllowed, requireAdminSession } from './auth.js';
 
 const execFileAsync=promisify(execFile);
 const app=express();
@@ -51,7 +51,7 @@ app.post('/api/auth/login',(req,res)=>{
  }
  loginFailures.delete(key);setSessionCookie(res,createSessionToken());res.setHeader('Cache-Control','no-store');res.json({authenticated:true});
 });
-app.post('/api/auth/logout',(_req,res)=>{clearSessionCookie(res);res.json({authenticated:false});});
+app.post('/api/auth/logout',(req,res)=>{revokeAdminSession(req);clearSessionCookie(res);res.setHeader('Cache-Control','no-store');res.json({authenticated:false});});
 app.use('/api',requireAdminSession);
 const storage=multer.diskStorage({
  destination:async(_req,_file,cb)=>{try{await mkdir(uploadsDir,{recursive:true});
