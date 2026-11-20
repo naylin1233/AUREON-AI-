@@ -12,6 +12,7 @@
   - re-enqueues queued/processing jobs after server restart, reuses validated completed chunks, and reprocesses incomplete chunks.
 - Job status endpoint: `GET /api/jobs/:id`.
 - Optional bearer-token API protection via `AUREON_API_TOKEN`.
+- Azure Burmese TTS adapter for Nilar/Thiha standard voices; stays disabled until server-side key and region are configured. No English fallback.
 - Production frontend static serving from `dist/`.
 - Docker image installs FFmpeg and persists `/app/storage/data`.
 
@@ -44,3 +45,7 @@ No AI story analysis/script generation, Myanmar TTS or voice cloning, scene-awar
 - Keep API/provider keys server-side; never commit secrets.
 - Process only media the user owns or is authorized to use.
 - Free-tier-first; do not enable paid billing without explicit approval.
+
+## Burmese TTS configuration
+
+Set `AZURE_SPEECH_KEY` and `AZURE_SPEECH_REGION` in the private server environment to enable the standard Burmese voices `my-MM-NilarNeural` and `my-MM-ThihaNeural`. The integration returns a clear 503 while credentials are absent and never falls back to English. Use the Azure Free (F0) tier only; do not upgrade to a paid tier without explicit approval. Live audio generation has not been verified until a valid resource is configured. Personal voice cloning is not included.
