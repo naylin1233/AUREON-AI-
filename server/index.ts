@@ -92,6 +92,9 @@ app.use(express.static(path.resolve(process.cwd(),'dist')));
 app.use((error:unknown,_req:Request,res:Response,_next:NextFunction)=>{
  const err=error as Error & {code?:string};
  if(err instanceof multer.MulterError)return res.status(err.code==='LIMIT_FILE_SIZE'?413:400).json({error:err.code==='LIMIT_FILE_SIZE'?`File exceeds ${uploadLimitMb} MB upload limit.`:err.message});
+ if(err.message.startsWith('Unsupported video type'))return res.status(415).json({error:err.message});
+ if(err.message.startsWith('Myanmar TTS is not configured'))return res.status(503).json({error:err.message});
+ if(err.message.startsWith('Azure Speech request failed'))return res.status(502).json({error:err.message});
  res.status(500).json({error:err.message||'Internal server error.'});
 });
 await initializeStore();
