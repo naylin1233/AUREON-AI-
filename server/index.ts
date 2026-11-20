@@ -3,7 +3,8 @@ import multer from 'multer';
 import { randomUUID } from 'node:crypto';
 import { mkdir } from 'node:fs/promises';
 import path from 'node:path';
-import { addJob, addProject, addSource, getJobs, getProjects, getProject, getSources, initializeStore, storageDirectory } from './store.js';
+import { addJob, addProject, addSource, getJobs, getProjects, getProject, getSource, getSources, getJob, initializeStore, storageDirectory } from './store.js';
+import { enqueueMediaJob, resumePendingMediaJobs } from './mediaWorker.js';
 
 const app=express();
 const port=Number(process.env.PORT||8787);
@@ -35,7 +36,7 @@ const upload=multer({storage,limits:{fileSize:uploadLimitMb*1024*1024,files:1},f
  cb(null,true);
 }});
 const modes=new Set(['Cinematic','Dialogue Breakdown','Narrator Story','Full Deep Dive','Short Viral 60s']);
-app.get('/api/health',(_req,res)=>res.json({ok:true,service:'AUREON AI API',version:'0.2.0',features:{projects:true,localUpload:true,durableJsonStore:true,aiGeneration:false,burmeseTts:false,videoRendering:false,oauthPublishing:false}}));
+app.get('/api/health',(_req,res)=>res.json({ok:true,service:'AUREON AI API',version:'0.3.0',features:{projects:true,localUpload:true,durableJsonStore:true,mediaPreparation:true,aiGeneration:false,burmeseTts:false,videoRendering:false,oauthPublishing:false}}));
 app.get('/api/projects',(_req,res)=>res.json({items:getProjects()}));
 app.post('/api/projects',async(req,res,next)=>{
  try{const title=typeof req.body?.title==='string'?req.body.title.trim():'';const recapMode=typeof req.body?.recapMode==='string'?req.body.recapMode:'Cinematic';
@@ -62,10 +63,13 @@ app.post('/api/projects/:id/url-source',async(req,res,next)=>{
 });
 app.post('/api/projects/:id/recap-jobs',async(req,res,next)=>{
  try{const project=getProject(String(req.params.id));if(!project)return res.status(404).json({error:'Project not found.'});
- const item=await addJob(project.id);res.status(202).json({item,note:item.note});
+ const source=getSources(project.id).filter(x=>x.kind==='upload'&&x.path).at(-1);
+ if(!source)return res.status(400).json({error:'Upload a local video source before starting media preparation. URL sources are metadata-only.'});
+ const item=await addJob(project.id,source.id);void enqueueMediaJob(item.id);res.status(202).json({item,note:'Media preparation job queued. AI recap generation has not started.'});
  }catch(e){next(e)}
 });
 app.get('/api/jobs',(_req,res)=>res.json({items:getJobs()}));
+app.get('/api/jobs/:id',(req,res)=>{const item=getJob(String(req.params.id));if(!item)return res.status(404).json({error:'Job not found.'});res.json({item});});
 app.use((error:unknown,_req:Request,res:Response,_next:NextFunction)=>{
  const err=error as Error & {code?:string};
  if(err instanceof multer.MulterError)return res.status(err.code==='LIMIT_FILE_SIZE'?413:400).json({error:err.code==='LIMIT_FILE_SIZE'?`File exceeds ${uploadLimitMb} MB upload limit.`:err.message});
@@ -73,4 +77,5 @@ app.use((error:unknown,_req:Request,res:Response,_next:NextFunction)=>{
 });
 await initializeStore();
 await mkdir(uploadsDir,{recursive:true});
+await resumePendingMediaJobs();
 app.listen(port,host,()=>console.log(`AUREON API listening on http://${host}:${port}`));
