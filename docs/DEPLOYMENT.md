@@ -2,11 +2,11 @@
 
 ## Current deployment readiness
 
-AUREON AI is currently a single-process Express + Vite application with local JSON state and local media files. The Docker image includes FFmpeg and binds to `0.0.0.0` inside the container.
+AUREON AI is a single-owner Express + Vite application with local JSON state and local media files. The Docker image includes FFmpeg and binds to `0.0.0.0` inside the container.
 
-**Do not expose this build as a public production service yet.** The current app does not have user login/session management, a production authorization model for browser requests, a managed database, or object storage. The API's optional bearer-token middleware is not yet integrated into the browser client, so enabling `AUREON_API_TOKEN` would also block normal UI API calls. A restart on ephemeral hosting can lose projects, uploads, audio, and rendered videos.
+**Owner login is now integrated end-to-end:** a server-side password check creates a signed, seven-day HttpOnly, SameSite=Strict session cookie; API routes require a valid session when login is configured. Public-interface startup is refused unless the owner password and session-signing secret are configured. Health and authentication bootstrap endpoints remain public. Login is rate-limited after repeated failed attempts.
 
-A public deployment should wait until authentication is implemented end-to-end and persistent database/object storage are configured. Do not enable paid hosting or billing without explicit approval.
+**This is not yet ready for public production use.** JSON state and media still depend on a persistent mounted volume; there is no managed database or object storage, no automated backup/restore, and no production hosting provider configured. Do not expose it until a persistent volume is attached and tested, HTTPS is enabled, and backup/recovery is verified. Do not enable paid hosting or billing without explicit approval.
 
 ## Configure YouTube API for local testing
 
@@ -44,12 +44,21 @@ The named Docker volume keeps application data across container recreation on th
 
 The backend checks for projects and runs the discovery task daily at 06:15 Asia/Bangkok while the process remains running. It also exposes a manual discovery endpoint for the References UI. Results are stored as metadata-only, reference-only entries. The app does not download videos, audio, captions, or transcripts and does not verify reuse rights. Search quota and availability are controlled by YouTube.
 
+## Owner login configuration
+
+For a public-interface deployment, set these as private server runtime environment variables (not GitHub source files and never `VITE_*` browser variables):
+
+- `AUREON_ADMIN_PASSWORD`: a unique password of at least 12 characters.
+- `AUREON_SESSION_SECRET`: a randomly generated secret of at least 32 bytes. Keep it stable across restarts so existing sessions remain valid.
+- Set `NODE_ENV=production` behind HTTPS so the session cookie receives the `Secure` attribute.
+- Set `HOST=0.0.0.0` only after the password and session secret are present. The server refuses public-interface startup without them.
+- Login uses an HttpOnly, SameSite=Strict cookie. Do not share the password or session secret.
+
 ## Before public hosting
 
-- Implement login and secure session handling, and authorize every project/resource by owner.
-- Integrate any API authentication with the browser client; do not ship a secret in `VITE_*` variables.
-- Replace local JSON state with a managed database and move uploaded media/audio/renders to persistent object storage.
-- Add upload limits, rate limits, HTTPS, secure headers, backup/restore, and operational monitoring.
+- Attach a persistent volume at `/app/storage/data`; verify projects, uploaded videos, voice samples, dialogue clips, subtitles, and rendered MP4 files survive a container restart.
+- Back up the volume and test restoring a copy before relying on it.
+- Add HTTPS, operational monitoring, and review upload limits and resource capacity.
 - Confirm the host supports FFmpeg, long-running jobs, sufficient disk/temporary space, and persistent storage.
 - Set `YOUTUBE_API_KEY` as a server-side runtime secret in the chosen host.
 - Review provider pricing and free-tier limits with an adult/guardian where required. Do not turn on paid billing automatically.
