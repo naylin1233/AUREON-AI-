@@ -22,10 +22,7 @@ jobs:
           node-version: 22
       - name: Install FFmpeg
         run: |
-          if ! command -v ffmpeg >/dev/null 2>&1; then
-            sudo apt-get update
-            sudo apt-get install -y ffmpeg
-          fi
+          sudo apt-get install -y ffmpeg
           ffmpeg -version
           ffprobe -version
       - name: Install dependencies
