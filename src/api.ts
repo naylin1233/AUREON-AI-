@@ -1,6 +1,7 @@
 export type Project = {id:string;title:string;recapMode:string;createdAt:string;sourceIds:string[]};
 export type Source = {id:string;projectId:string;kind:'upload'|'url';name:string;path?:string;url?:string;mimeType?:string;size?:number;status:'stored'|'awaiting_review';createdAt:string};
 export type TtsVoice = 'Nilar'|'Thiha';
+export type ActorVoiceProfile = {id:string;name:string;character:string;language:'my-MM';fileName:string;mimeType:string;size:number;consentConfirmed:true;createdAt:string;audioUrl:string};
 export type RecapScript = {script:string;model:string;interactionId?:string;usage?:{total_tokens?:number;total_input_tokens?:number;total_output_tokens?:number}};
 export type Job = {id:string;projectId:string;sourceId?:string;kind:'recap';status:'queued'|'processing'|'media_ready'|'transcribing'|'transcribed'|'failed'|'awaiting_pipeline';stage:string;progress:number;note:string;error?:string;chunkCount?:number;durationSeconds?:number;transcript?:string;transcriptChunks?:string[];transcribedChunkCount?:number;transcriptionTotalChunks?:number;createdAt:string;updatedAt:string};
 async function request<T>(url:string,init?:RequestInit):Promise<T>{
@@ -22,6 +23,8 @@ export const api={
  jobs:()=>request<{items:Job[]}>('/api/jobs'),
  aiStatus:()=>request<{configured:boolean;model:string;provider:string}>('/api/ai/status'),
  generateRecapScript:(transcript:string,recapMode:string,title:string,consent:boolean)=>request<{item:RecapScript;note:string}>('/api/ai/recap-script',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({transcript,recapMode,title,consent})}),
+ voices:()=>request<{items:ActorVoiceProfile[]}>('/api/voices'),
+ addVoice:(name:string,character:string,file:File,consent:boolean)=>{const body=new FormData();body.append('name',name);body.append('character',character);body.append('consent',String(consent));body.append('audio',file);return request<{item:ActorVoiceProfile;note:string}>('/api/voices',{method:'POST',body})},
  ttsStatus:()=>request<{configured:boolean;language:string;voices:{label:TtsVoice;id:string}[]}>('/api/tts/status'),
  synthesize:(text:string,voice:TtsVoice,consent:boolean)=>request<{item:{id:string;bytes:number;voice:string;audioUrl:string;language:string}}>('/api/tts/synthesize',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text,voice,consent})})
 };
