@@ -47,7 +47,9 @@ try{
  const voiceStatus=await (await fetch(base+'/api/tts/status')).json();
  assert.equal(voiceStatus.configured,false);
  assert.equal(voiceStatus.language,'my-MM');
- const ttsUnavailable=await fetch(base+'/api/tts/synthesize',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:'မင်္ဂလာပါ',voice:'Nilar'})});
+ const ttsNoConsent=await fetch(base+'/api/tts/synthesize',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:'မင်္ဂလာပါ',voice:'Nilar',consent:false})});
+ assert.equal(ttsNoConsent.status,400);
+ const ttsUnavailable=await fetch(base+'/api/tts/synthesize',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:'မင်္ဂလာပါ',voice:'Nilar',consent:true})});
  assert.equal(ttsUnavailable.status,503);
 
  const projectResponse=await fetch(base+'/api/projects',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({title:'Smoke Test Project',recapMode:'Cinematic'})});
