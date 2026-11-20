@@ -37,3 +37,24 @@
 .script-output{margin-top:20px;border:1px solid #554522;background:#12100d;border-radius:11px;padding:16px}
 .script-output pre{white-space:pre-wrap;overflow-wrap:anywhere;max-height:560px;overflow:auto;font:12px/1.9 system-ui,sans-serif;color:#e3d8bf;margin:16px 0}
 .secondary-button{background:#292316;border:1px solid #715c2e;color:#e7ca78;padding:9px 13px;border-radius:7px;cursor:pointer;font-size:11px}
+
+.subtitle-toolbar{display:flex;align-items:end;gap:12px;flex-wrap:wrap;margin:18px 0}
+.subtitle-toolbar>label:first-child{display:flex;flex-direction:column;gap:7px;font-size:11px;color:#b9ad91}
+.subtitle-toolbar select{min-width:145px}
+.subtitle-file{position:relative;display:inline-flex;align-items:center;gap:8px;min-height:40px;padding:0 14px;border:1px solid #665127;border-radius:7px;color:#e8ca70;font-size:11px;cursor:pointer;overflow:hidden}
+.subtitle-file input{position:absolute;inset:0;opacity:0;cursor:pointer}
+.subtitle-export{display:flex;flex-direction:column;gap:10px;padding:15px;margin:18px 0;border:1px solid #423720;border-radius:9px;background:#15130f}
+.subtitle-export>b{font-size:12px;color:#e6d7b3}
+.outline-button{background:transparent;border:1px solid #6d582a;color:#e6ca77;border-radius:6px;padding:9px 12px;font-size:10px;cursor:pointer}
+.outline-button:hover{background:#2b2416}
+.subtitle-list{display:flex;flex-direction:column;gap:12px;margin-top:15px}
+.subtitle-cue{padding:14px;border:1px solid #3d3525;border-radius:9px;background:#14120e}
+.subtitle-cue-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;color:#e6ca77;font-size:11px}
+.remove-cue{border:0;background:transparent;color:#d69c87;font-size:10px;cursor:pointer}
+.subtitle-times,.subtitle-languages{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.subtitle-times{margin-bottom:10px}
+.subtitle-times label,.subtitle-languages label{display:flex;flex-direction:column;gap:6px;font-size:10px;color:#b9ad91}
+.subtitle-times input,.subtitle-languages textarea{width:100%;box-sizing:border-box;background:#0f0e0b;border:1px solid #4a402b;border-radius:6px;padding:9px;color:#eee5d1;font:inherit}
+.subtitle-languages textarea{resize:vertical;min-height:58px;line-height:1.6}
+.subtitle-error{color:#e6a08f;font-size:11px;margin:10px 0}
+@media(max-width:640px){.subtitle-times,.subtitle-languages{grid-template-columns:1fr}.subtitle-toolbar{align-items:stretch}.subtitle-toolbar>*{width:100%}.subtitle-file{justify-content:center}}
