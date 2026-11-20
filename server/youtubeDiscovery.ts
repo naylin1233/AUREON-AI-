@@ -1,0 +1,126 @@
+import { addReferenceSource, getProjects } from './store.js';
+
+type SearchItem = {
+  id?: { kind?: string; videoId?: string; channelId?: string };
+  snippet?: { title?: string; channelTitle?: string; channelId?: string; publishedAt?: string };
+};
+type SearchResponse = { items?: SearchItem[]; error?: { message?: string } };
+
+const defaultQueries = ['donghua recap', 'anime recap', 'Chinese animation recap', 'movie recap'];
+let lastRunAt: string | null = null;
+let lastRunSummary = 'Not run yet';
+let lastManualRunMs = 0;
+let scheduled = false;
+
+export function youtubeReferenceDiscoveryStatus() {
+  return {
+    configured: Boolean(process.env.YOUTUBE_API_KEY),
+    provider: 'YouTube Data API v3',
+    schedule: '06:15 Asia/Bangkok daily',
+    lastRunAt,
+    lastRunSummary,
+    queryCount: configuredQueries().length
+  };
+}
+
+function configuredQueries() {
+  const raw = process.env.YOUTUBE_REFERENCE_QUERIES;
+  const values = raw ? raw.split(';') : defaultQueries;
+  return [...new Set(values.map(x => x.trim()).filter(Boolean))].slice(0, 4);
+}
+
+async function search(kind: 'video' | 'channel', query: string): Promise<SearchItem[]> {
+  const key = process.env.YOUTUBE_API_KEY;
+  if (!key) throw new Error('YouTube discovery is not configured. Add YOUTUBE_API_KEY to the private server environment.');
+  const url = new URL('https://www.googleapis.com/youtube/v3/search');
+  url.search = new URLSearchParams({
+    part: 'snippet',
+    type: kind,
+    q: query,
+    maxResults: '5',
+    order: 'relevance',
+    safeSearch: 'strict',
+    relevanceLanguage: 'en',
+    regionCode: 'US',
+    key
+  }).toString();
+  const response = await fetch(url, { headers: { accept: 'application/json' }, signal: AbortSignal.timeout(15000) });
+  const data = await response.json() as SearchResponse;
+  if (!response.ok) throw new Error(data.error?.message || `YouTube search failed (${response.status}).`);
+  return Array.isArray(data.items) ? data.items : [];
+}
+
+export async function discoverYouTubeReferences(projectIds: string[], customQueries?: string[]) {
+  if (!process.env.YOUTUBE_API_KEY) throw new Error('YouTube discovery is not configured. Add YOUTUBE_API_KEY to the private server environment.');
+  const ids = [...new Set(projectIds)].filter(Boolean);
+  if (!ids.length) throw new Error('Create or select a project before discovering references.');
+  const queries = [...new Set((customQueries?.length ? customQueries : configuredQueries()).map(x => x.trim()).filter(Boolean))].slice(0, 4);
+  if (!queries.length) throw new Error('Add at least one discovery keyword.');
+  const found = new Map<string, { kind: 'channel' | 'video'; url: string; title: string; channelName: string; language: string; notes: string }>();
+  for (const query of queries) {
+    for (const kind of ['channel', 'video'] as const) {
+      const items = await search(kind, query);
+      for (const item of items) {
+        const snippet = item.snippet || {};
+        const id = kind === 'video' ? item.id?.videoId : item.id?.channelId || snippet.channelId;
+        if (!id) continue;
+        const url = kind === 'video'
+          ? `https://www.youtube.com/watch?v=${encodeURIComponent(id)}`
+          : `https://www.youtube.com/channel/${encodeURIComponent(id)}`;
+        found.set(url, {
+          kind,
+          url,
+          title: (snippet.title || '').slice(0, 160),
+          channelName: (kind === 'channel' ? snippet.title : snippet.channelTitle || '').slice(0, 100),
+          language: 'Unknown',
+          notes: `Automatically discovered from keyword: ${query}. Metadata only; review the source and its rights before using any material.`
+        });
+      }
+    }
+  }
+  let saved = 0;
+  for (const projectId of ids) {
+    for (const item of found.values()) {
+      await addReferenceSource({ projectId, ...item, rightsStatus: 'reference_only' });
+      saved++;
+    }
+  }
+  lastRunAt = new Date().toISOString();
+  lastRunSummary = `${found.size} unique YouTube references found; ${saved} project reference records saved.`;
+  return { found: found.size, saved, queries, note: lastRunSummary };
+}
+
+export async function discoverReferencesManually(projectId: string, customQueries?: string[]) {
+  if (Date.now() - lastManualRunMs < 60_000) throw new Error('Please wait one minute before starting another YouTube search.');
+  lastManualRunMs = Date.now();
+  return discoverYouTubeReferences([projectId], customQueries);
+}
+
+function msUntilBangkok0615() {
+  const now = new Date();
+  const bangkok = new Date(now.getTime() + 7 * 60 * 60 * 1000);
+  let targetUtc = Date.UTC(bangkok.getUTCFullYear(), bangkok.getUTCMonth(), bangkok.getUTCDate(), 6, 15) - 7 * 60 * 60 * 1000;
+  if (targetUtc <= now.getTime()) targetUtc += 24 * 60 * 60 * 1000;
+  return targetUtc - now.getTime();
+}
+
+export function startDailyYouTubeReferenceDiscovery() {
+  if (scheduled) return;
+  scheduled = true;
+  const scheduleNext = () => setTimeout(async () => {
+    try {
+      const projectIds = getProjects().map(project => project.id);
+      if (projectIds.length && process.env.YOUTUBE_API_KEY) {
+        const result = await discoverYouTubeReferences(projectIds);
+        console.log('[YouTube reference discovery]', result.note);
+      }
+    } catch (error) {
+      lastRunAt = new Date().toISOString();
+      lastRunSummary = error instanceof Error ? error.message : 'Automatic YouTube discovery failed.';
+      console.error('[YouTube reference discovery]', lastRunSummary);
+    } finally {
+      scheduleNext();
+    }
+  }, msUntilBangkok0615());
+  scheduleNext();
+}

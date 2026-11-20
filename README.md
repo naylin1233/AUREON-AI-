@@ -113,3 +113,10 @@ Official references: [Gemini Interactions API](https://ai.google.dev/gemini-api/
 ## Actor Voice Library
 
 The Myanmar Voice Studio supports adding consented actor recordings as named character voice references. Supported uploads: MP3, WAV, M4A, OGG, WEBM, AAC and FLAC (maximum 30 MB each). Profiles are stored locally under `storage/data/voice-profiles/` with a character/role label and an in-app audio preview. The uploader must confirm ownership or permission from the voice owner. These are original recordings only: profiles can be assigned to named characters within a project, and the assigned recording can be previewed. The current system does not clone the actor's voice or synthesize new lines in that actor's voice. Project Dialogue Clips can store original/authorized audio recordings, associate them with a character/voice assignment, validate duration with FFprobe, set a millisecond timeline start and preview the recording. During MP4 rendering, these clips are mixed with the source audio at their configured timeline offsets.
+
+
+## Automatic foreign YouTube recap discovery
+
+The Reference Library can discover public recap channels and videos using the official YouTube Data API v3. Set `YOUTUBE_API_KEY` in the private server environment after enabling YouTube Data API v3 in a Google Cloud project. Optional `YOUTUBE_REFERENCE_QUERIES` accepts up to four semicolon-separated search terms; defaults are donghua recap, anime recap, Chinese animation recap, and movie recap.
+
+The server runs discovery daily at **06:15 Asia/Bangkok** and saves metadata-only references to existing projects. The References page also has a manual search button. Each run makes up to eight `search.list` requests (four terms × channel/video); YouTube's default quota allows 100 search requests per day. Keep the key private and restrict it to the YouTube Data API. Search results are marked **REFERENCE ONLY**. This feature does not download videos, audio, transcripts, or captions, and it does not verify reuse rights. Only import or adapt source material when you have permission or a suitable license. The feature does not enable paid billing.

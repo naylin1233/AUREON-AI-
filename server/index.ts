@@ -12,6 +12,7 @@ import { azureTtsStatus, synthesizeBurmese, type BurmeseVoice } from './tts/azur
 import { geminiStatus, generateBurmeseRecap } from './ai/gemini.js';
 import { enqueueTranscriptionJob, resumePendingTranscriptionJobs } from './ai/transcriptionWorker.js';
 import { enqueueRenderJob, resumePendingRenderJobs } from './renderWorker.js';
+import { discoverReferencesManually, startDailyYouTubeReferenceDiscovery, youtubeReferenceDiscoveryStatus } from './youtubeDiscovery.js';
 
 const execFileAsync=promisify(execFile);
 const app=express();
@@ -127,6 +128,16 @@ app.post('/api/projects/:id/url-source',async(req,res,next)=>{
  res.status(201).json({item,note:'URL saved for review only. This server does not download or process remote media yet.'});
  }catch(e){next(e)}
 });
+app.get('/api/reference-discovery/status',(_req,res)=>res.json(youtubeReferenceDiscoveryStatus()));
+app.post('/api/projects/:id/references/discover',async(req,res,next)=>{
+ try{
+  const project=getProject(String(req.params.id));if(!project)return res.status(404).json({error:'Project not found.'});
+  const raw=typeof req.body?.queries==='string'?req.body.queries:'';
+  const queries=raw.split(';').map((x:string)=>x.trim()).filter(Boolean).slice(0,4);
+  const result=await discoverReferencesManually(project.id,queries);
+  res.status(201).json({item:result,items:getReferenceSources(project.id),status:youtubeReferenceDiscoveryStatus()});
+ }catch(e){next(e)}
+});
 app.get('/api/projects/:id/references',(req,res)=>{const project=getProject(String(req.params.id));if(!project)return res.status(404).json({error:'Project not found.'});res.json({items:getReferenceSources(project.id)});});
 app.post('/api/projects/:id/references',async(req,res,next)=>{
  try{
@@ -212,4 +223,5 @@ await mkdir(uploadsDir,{recursive:true});
 await resumePendingMediaJobs();
 await resumePendingTranscriptionJobs();
 await resumePendingRenderJobs();
+startDailyYouTubeReferenceDiscovery();
 app.listen(port,host,()=>console.log(`AUREON API listening on http://${host}:${port}`));
