@@ -9,7 +9,7 @@
   - validates duration and audio stream;
   - extracts mono 16 kHz PCM WAV into 10-minute chunks;
   - records progress, chunk count, output directory and errors;
-  - re-enqueues queued/processing jobs after server restart (re-extracts from the beginning; per-chunk checkpoint resume is not yet implemented).
+  - re-enqueues queued/processing jobs after server restart, reuses validated completed chunks, and reprocesses incomplete chunks.
 - Job status endpoint: `GET /api/jobs/:id`.
 - Optional bearer-token API protection via `AUREON_API_TOKEN`.
 - Production frontend static serving from `dist/`.
