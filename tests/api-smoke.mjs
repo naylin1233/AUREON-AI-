@@ -33,7 +33,7 @@ try{
  await start();
  const dailyStatus=await (await fetch(base+'/api/daily-topic/status')).json();
  assert.equal(dailyStatus.configured,false);assert.equal(dailyStatus.schedule,'06:00 Asia/Bangkok daily');assert.equal(dailyStatus.latest,null);
- const dailyUnavailable=await fetch(base+'/api/daily-topic/select',{method:'POST'});assert.equal(dailyUnavailable.status,503);assert.match((await dailyUnavailable.json()).note,/not configured/i);
+ const dailyUnavailable=await fetch(base+'/api/daily-topic/select',{method:'POST'});assert.equal(dailyUnavailable.status,503);assert.match((await dailyUnavailable.json()).error,/not configured/i);
  const health=await (await fetch(base+'/api/health')).json();
  assert.equal(health.ok,true);
  assert.equal(health.features.mediaPreparation,true);
