@@ -16,8 +16,7 @@ Responsive Burmese-first React + TypeScript + Vite dashboard with five recap mod
 ### Stage 3 — Real media preparation
 - FFmpeg/FFprobe validates uploaded video duration and audio stream.
 - Extracts mono 16 kHz WAV audio into 10-minute chunks, supporting long source videos.
-- Samples 480px-wide JPEG reference frames every 30 seconds for later visual review.
-- Stores job status, progress, output path, audio chunk count, sampled frame count and failure details.
+- Stores job status, progress, output path, audio chunk count and failure details.
 - Re-enqueues queued/processing jobs after server restart, reuses validated completed chunks, and reprocesses incomplete chunks.
 - Docker runtime includes FFmpeg and a persistent data volume.
 
@@ -47,7 +46,7 @@ docker run --rm -p 8787:8787 -v aureon-data:/app/storage/data aureon-ai
 
 ## Capability boundary
 
-The FFmpeg media preparation pipeline (audio chunks plus sampled visual reference frames) is implemented and covered by CI smoke tests. It does **not** perform AI story analysis, script generation, transcription, Myanmar TTS, voice cloning, scene-aware video editing, final video rendering, subtitle synchronization/export, remote URL downloads, cloud storage, managed database, social OAuth, automatic publishing or Android packaging. A job marked `media_ready` means audio chunks and sampled frames were extracted, not that a recap video was generated.
+The FFmpeg audio preparation pipeline is implemented and covered by CI smoke tests. It does **not** perform AI story analysis, script generation, transcription, Myanmar TTS, voice cloning, scene-aware video editing, final video rendering, subtitle synchronization/export, remote URL downloads, cloud storage, managed database, social OAuth, automatic publishing or Android packaging. A job marked `media_ready` means audio chunks were extracted, not that a recap video was generated.
 
 ## Principles
 - Free-tier-first; no paid billing without explicit approval.
