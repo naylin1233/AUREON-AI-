@@ -21,7 +21,7 @@ test('uploads one audio chunk, transcribes it, and deletes the temporary Gemini 
   if(url==='https://generativelanguage.googleapis.com/upload/v1beta/files')return new Response('',{status:200,headers:{'x-goog-upload-url':uploadUrl}});
   if(url===uploadUrl)return new Response(JSON.stringify({file:{name:'files/test-audio',uri:'https://generativelanguage.googleapis.com/files/test-audio',state:'ACTIVE'}}),{status:200,headers:{'content-type':'application/json'}});
   if(url==='https://generativelanguage.googleapis.com/v1beta/interactions')return new Response(JSON.stringify({steps:[{type:'model_output',content:[{type:'text',text:'这是测试转录文本'}]}]}),{status:200,headers:{'content-type':'application/json'}});
-  if(url==='https://generativelanguage.googleapis.com/v1beta/files/files/test-audio'&&method==='DELETE')return new Response('{}',{status:200,headers:{'content-type':'application/json'}});
+  if(url==='https://generativelanguage.googleapis.com/v1beta/files/test-audio'&&method==='DELETE')return new Response('{}',{status:200,headers:{'content-type':'application/json'}});
   throw new Error('Unexpected mocked Gemini request: '+method+' '+url);
  }) as typeof fetch;
  try{
