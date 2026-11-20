@@ -58,3 +58,6 @@
 .subtitle-languages textarea{resize:vertical;min-height:58px;line-height:1.6}
 .subtitle-error{color:#e6a08f;font-size:11px;margin:10px 0}
 @media(max-width:640px){.subtitle-times,.subtitle-languages{grid-template-columns:1fr}.subtitle-toolbar{align-items:stretch}.subtitle-toolbar>*{width:100%}.subtitle-file{justify-content:center}}
+
+.ai-consent{display:flex;align-items:flex-start;gap:10px;margin:12px 0 18px;padding:12px;border:1px solid #5a4928;border-radius:8px;background:#17140e;color:#c9bc9b;font-size:10px;line-height:1.7}
+.ai-consent input{flex:0 0 auto;margin-top:3px;accent-color:#d5ad4d}
