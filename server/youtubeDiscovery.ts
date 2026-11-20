@@ -6,7 +6,7 @@ type SearchItem = {
 };
 type SearchResponse = { items?: SearchItem[]; error?: { message?: string } };
 
-const defaultQueries = ['donghua recap', 'anime recap', 'Chinese animation recap', 'movie recap'];
+const defaultQueries = ['popular anime recap', 'foreign movie recap', '3D animation movie recap', 'Chinese donghua recap'];
 let lastRunAt: string | null = null;
 let lastRunSummary = 'Not run yet';
 let lastManualRunMs = 0;
@@ -38,7 +38,7 @@ async function search(kind: 'video' | 'channel', query: string): Promise<SearchI
     type: kind,
     q: query,
     maxResults: '5',
-    order: 'relevance',
+    order: kind === 'video' ? 'viewCount' : 'relevance',
     safeSearch: 'strict',
     relevanceLanguage: 'en',
     regionCode: 'US',
@@ -73,7 +73,7 @@ export async function discoverYouTubeReferences(projectIds: string[], customQuer
           title: (snippet.title || '').slice(0, 160),
           channelName: (kind === 'channel' ? snippet.title : snippet.channelTitle || '').slice(0, 100),
           language: 'Unknown',
-          notes: `Automatically discovered from keyword: ${query}. Metadata only; review the source and its rights before using any material.`
+          notes: `Automatically discovered from keyword: ${query}. Video search is ordered by YouTube view count; channel search is relevance-ranked. Metadata only; review the source and its rights before using any material.`
         });
       }
     }
