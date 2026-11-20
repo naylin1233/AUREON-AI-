@@ -1,12 +1,11 @@
-const MODEL_DEFAULT='gemini-3.8-flash';
+const MODEL='gemini-3.8-flash';
 export function geminiStatus(){
- return {configured:Boolean(process.env.GEMINI_API_KEY),model:process.env.GEMINI_MODEL||MODEL_DEFAULT,provider:'Google Gemini Interactions API'};
+ return {configured:Boolean(process.env.GEMINI_API_KEY),model:MODEL,provider:'Google Gemini Interactions API',freeTierOnly:true};
 }
 export async function generateBurmeseRecap(input:{transcript:string;mode:string;title?:string}){
  const key=process.env.GEMINI_API_KEY;
  if(!key)throw new Error('AI recap is not configured. Add GEMINI_API_KEY to the private server environment.');
- const model=(process.env.GEMINI_MODEL||MODEL_DEFAULT).trim();
- if(!/^[a-zA-Z0-9._-]{3,100}$/.test(model))throw new Error('Invalid Gemini model name.');
+ const model=MODEL;
  const prompt=[
   'You are the Burmese-language script editor for AUREON AI.',
   'Create an original Myanmar-language recap script based ONLY on the supplied transcript.',
