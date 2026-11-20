@@ -37,3 +37,5 @@ export function serializeSubtitles(cues:SubtitleCue[],language:'myanmar'|'englis
 export function createSubtitleCue(id:string,start='00:00:00,000',end='00:00:03,000'):SubtitleCue{
  return {id,start,end,myanmar:'',english:''};
 }
+
+export function addSecondsToTimestamp(value:string,seconds:number){return msToTimestamp(timestampToMs(value)+seconds*1000);}
