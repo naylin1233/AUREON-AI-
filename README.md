@@ -88,6 +88,15 @@ docker run --rm -p 8787:8787 -v aureon-data:/app/storage/data aureon-ai
 - Script generation is available only after the job reaches the `transcribed` state.
 - This creates a reviewable script draft; it does not create narration audio or a finished recap video.
 
+### Stage 10 — Platform-specific recap editions
+- From one reviewed Burmese recap draft, generate three distinct editorial versions rather than reposting one identical video/script.
+- YouTube: full long-form recap script, title, description and tags.
+- Facebook: separately paced mid-length recap script, title, caption and tags.
+- TikTok: 30–60 second vertical teaser, unique hook/caption, and a CTA pointing viewers to the YouTube full recap.
+- TikTok CTA intentionally uses `[YOUTUBE FULL VIDEO LINK]`; replace it with the real published YouTube URL before posting.
+- Requires explicit consent before sending the recap draft to Gemini. Output is a draft for human review, not an automatic post.
+- The platform pack does not establish which topics are currently popular. Daily trend discovery, no-repeat topic scheduling and social publishing are still separate work.
+
 ## Not implemented yet
 - Automatic speech recognition or transcript extraction from uploaded videos.
 - Automatic dialogue script generation and lip-sync.
