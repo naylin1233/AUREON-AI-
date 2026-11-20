@@ -1,23 +1,23 @@
 import { spawn } from 'node:child_process';
-import { mkdir, readFile, stat, writeFile, unlink } from 'node:fs/promises';
+import { mkdir, stat, writeFile, unlink, rm } from 'node:fs/promises';
 import path from 'node:path';
-import { getDialogueClips, getJob, getProject, getRenderJob, getSource, getSubtitleTrack, getRenderJobs, storageDirectory, updateRenderJob } from './store.js';
+import { getDialogueClips, getProject, getRenderJob, getSource, getSubtitleTrack, getRenderJobs, storageDirectory, updateRenderJob } from './store.js';
 
 function run(command:string,args:string[],onProgress?:(value:string)=>void){
  return new Promise<void>((resolve,reject)=>{
   const child=spawn(command,args,{stdio:['ignore','pipe','pipe']});
   let stdout='',stderr='';
   child.stdout.setEncoding('utf8');child.stderr.setEncoding('utf8');
-  child.stdout.on('data',(chunk:string)=>{stdout+=chunk;let index:number;while((index=stdout.indexOf('\\n'))>=0){const line=stdout.slice(0,index).trim();stdout=stdout.slice(index+1);if(line)onProgress?.(line);}});
+  child.stdout.on('data',(chunk:string)=>{stdout+=chunk;let index:number;while((index=stdout.indexOf('\n'))>=0){const line=stdout.slice(0,index).trim();stdout=stdout.slice(index+1);if(line)onProgress?.(line);}});
   child.stderr.on('data',(chunk:string)=>{stderr+=chunk;if(stderr.length>200000)stderr=stderr.slice(-200000)});
   child.on('error',error=>reject(new Error(`Could not start ${command}. Install FFmpeg and ensure it is on PATH. ${error.message}`)));
   child.on('close',code=>code===0?resolve():reject(new Error(stderr.trim()||`${command} exited with code ${code}`)));
  });
 }
-function toMs(value:string){const m=value.replace(',','.').match(/^(\\d{2}):(\\d{2}):(\\d{2})\\.(\\d{1,3})$/);if(!m)throw new Error('Invalid stored subtitle timestamp.');return ((Number(m[1])*60+Number(m[2]))*60+Number(m[3]))*1000+Number((m[4]+'000').slice(0,3));}
+function toMs(value:string){const m=value.replace(',','.').match(/^(\d{2}):(\d{2}):(\d{2})\.(\d{1,3})$/);if(!m)throw new Error('Invalid stored subtitle timestamp.');return ((Number(m[1])*60+Number(m[2]))*60+Number(m[3]))*1000+Number((m[4]+'000').slice(0,3));}
 function makeSrt(cues:{start:string;end:string;myanmar:string;english:string}[],language:'myanmar'|'english'){
  const selected=cues.filter(c=>(language==='myanmar'?c.myanmar:c.english).trim());
- return selected.map((cue,i)=>{if(toMs(cue.end)<=toMs(cue.start))throw new Error('Subtitle end time must be later than start time.');const text=language==='myanmar'?cue.myanmar:cue.english;return `${i+1}\\n${cue.start.replace('.',',')} --> ${cue.end.replace('.',',')}\\n${text.trim()}`;}).join('\\n\\n')+'\\n';
+ return selected.map((cue,i)=>{if(toMs(cue.end)<=toMs(cue.start))throw new Error('Subtitle end time must be later than start time.');const text=language==='myanmar'?cue.myanmar:cue.english;return `${i+1}\n${cue.start.replace('.',',')} --> ${cue.end.replace('.',',')}\n${text.trim()}`;}).join('\n\n')+'\n';
 }
 let queue=Promise.resolve();
 export function enqueueRenderJob(id:string){queue=queue.then(()=>processRenderJob(id)).catch(error=>console.error('AUREON render queue error',error));return queue;}
@@ -50,6 +50,6 @@ async function processRenderJob(id:string){
   const result=await stat(output);if(!result.isFile()||result.size<1024)throw new Error('FFmpeg output validation failed: rendered MP4 is empty or too small.');
   await updateRenderJob(id,{status:'completed',progress:100,outputPath:path.relative(process.cwd(),output),note:'MP4 render complete. Dialogue clips are mixed at their timeline offsets; Myanmar/English subtitles are included as selectable soft tracks.'});
  }catch(error){const message=error instanceof Error?error.message:'Unknown rendering error';await unlink(output).catch(()=>undefined);await updateRenderJob(id,{status:'failed',progress:0,error:message,note:'FFmpeg rendering failed. Check source media, dialogue clips and FFmpeg support.'});}
- finally{await import('node:fs/promises').then(fs=>fs.rm(tempDir,{recursive:true,force:true})).catch(()=>undefined);}
+ finally{await rm(tempDir,{recursive:true,force:true}).catch(()=>undefined);}
 }
 export async function resumePendingRenderJobs(){for(const job of getRenderJobs('')){if(job.status==='queued'||job.status==='rendering'){await updateRenderJob(job.id,{status:'queued',progress:job.progress||0,note:'Resuming FFmpeg render job.'});void enqueueRenderJob(job.id);}}}

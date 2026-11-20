@@ -69,7 +69,7 @@ export async function addDialogueClip(input:Omit<DialogueClip,'id'|'createdAt'>)
 
 export function getSubtitleTrack(projectId:string){return state.subtitleTracks.find(x=>x.projectId===projectId)??{projectId,cues:[],updatedAt:''};}
 export async function saveSubtitleTrack(projectId:string,cues:StoredSubtitleCue[]){const item={projectId,cues,updatedAt:new Date().toISOString()};const index=state.subtitleTracks.findIndex(x=>x.projectId===projectId);if(index>=0)state.subtitleTracks[index]=item;else state.subtitleTracks.push(item);await persist();return item;}
-export function getRenderJobs(projectId:string){return state.renderJobs.filter(x=>x.projectId===projectId).sort((a,b)=>b.createdAt.localeCompare(a.createdAt));}
+export function getRenderJobs(projectId:string){return state.renderJobs.filter(x=>!projectId||x.projectId===projectId).sort((a,b)=>b.createdAt.localeCompare(a.createdAt));}
 export function getRenderJob(id:string){return state.renderJobs.find(x=>x.id===id);}
 export async function addRenderJob(input:Omit<RenderJob,'id'|'createdAt'|'updatedAt'|'progress'|'status'|'note'>){const now=new Date().toISOString();const item:RenderJob={...input,id:randomUUID(),status:'queued',progress:0,note:'Waiting for FFmpeg rendering worker.',createdAt:now,updatedAt:now};state.renderJobs.push(item);await persist();return item;}
 export async function updateRenderJob(id:string,patch:Partial<Omit<RenderJob,'id'|'projectId'|'sourceId'|'createdAt'>>){const item=getRenderJob(id);if(!item)return undefined;Object.assign(item,patch,{updatedAt:new Date().toISOString()});await persist();return item;}
