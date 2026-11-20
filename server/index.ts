@@ -84,6 +84,7 @@ app.post('/api/ai/recap-script',async(req,res,next)=>{
   if(req.body?.consent!==true)return res.status(400).json({error:'Confirm the Google Gemini Free Tier data-use notice before sending this transcript.'});
   if(!modes.has(recapMode))return res.status(400).json({error:'Invalid recap mode.'});
   if(!geminiStatus().configured)return res.status(503).json({error:'AI recap is not configured. Add GEMINI_API_KEY to the private server environment.'});
+  if(err.message.startsWith('YouTube discovery is not configured'))return res.status(503).json({error:err.message});
   const result=await generateBurmeseRecap({transcript,mode:recapMode,title});
   res.status(201).json({item:result,note:'Draft generated from the transcript you provided. Review names and story details before using it.'});
  }catch(e){next(e)}
