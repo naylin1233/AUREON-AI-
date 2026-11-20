@@ -8,10 +8,14 @@ type SearchResponse = { items?: SearchItem[]; error?: { message?: string } };
 type VideoDetail = {id:string;snippet?:{title?:string;channelTitle?:string;publishedAt?:string};statistics?:{viewCount?:string}};
 type VideoListResponse = {items?:VideoDetail[];error?:{message?:string}};
 const topicCategories = [
-  {category:'Anime',query:'popular anime recap'},
-  {category:'Foreign Movie',query:'foreign movie recap'},
-  {category:'3D Animation',query:'3D animated movie recap'},
-  {category:'Donghua',query:'Chinese donghua recap'}
+  {category:'Anime',query:'trending anime recap'},
+  {category:'Donghua',query:'trending Chinese donghua 3D animation'},
+  {category:'3D Animation',query:'trending 3D animated movie'},
+  {category:'Movie Trailer',query:'trending foreign movie trailer 2026'},
+  {category:'Fantasy Movie',query:'popular fantasy adventure movie trailer 2026'},
+  {category:'Sci-Fi Movie',query:'trending science fiction movie trailer 2026'},
+  {category:'Korean Drama',query:'popular Korean drama recap'},
+  {category:'Animation Movie',query:'trending animated film trailer 2026'}
 ];
 let topicStatusMessage = 'Daily topic has not been selected yet.';
 
