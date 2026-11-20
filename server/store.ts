@@ -6,11 +6,14 @@ export type Project = { id:string; title:string; recapMode:string; createdAt:str
 export type Source = { id:string; projectId:string; kind:'upload'|'url'; name:string; path?:string; url?:string; mimeType?:string; size?:number; status:'stored'|'awaiting_review'; createdAt:string };
 export type VoiceAssignment = {id:string;projectId:string;voiceProfileId:string;character:string;createdAt:string};
 export type DialogueClip = {id:string;projectId:string;character:string;voiceAssignmentId?:string;fileName:string;path:string;mimeType:string;size:number;durationSeconds:number;startMs:number;createdAt:string};
+export type StoredSubtitleCue = {id:string;start:string;end:string;myanmar:string;english:string};
+export type SubtitleTrack = {projectId:string;cues:StoredSubtitleCue[];updatedAt:string};
+export type RenderJob = {id:string;projectId:string;sourceId:string;status:'queued'|'rendering'|'completed'|'failed';progress:number;note:string;includeDialogue:boolean;includeMyanmar:boolean;includeEnglish:boolean;outputPath?:string;durationSeconds?:number;error?:string;createdAt:string;updatedAt:string};
 export type VoiceProfile = {id:string;name:string;character:string;language:'my-MM';fileName:string;path:string;mimeType:string;size:number;consentConfirmed:true;createdAt:string};
 export type JobStatus = 'queued'|'processing'|'media_ready'|'transcribing'|'transcribed'|'failed'|'awaiting_pipeline';
 export type Job = { id:string; projectId:string; sourceId?:string; kind:'recap'; status:JobStatus; stage:string; progress:number; note:string; error?:string; outputDir?:string; durationSeconds?:number; chunkCount?:number; transcript?:string; transcriptChunks?:string[]; transcriptionConsentAt?:string; transcribedChunkCount?:number; transcriptionTotalChunks?:number; createdAt:string; updatedAt:string };
-type State = { projects:Project[]; sources:Source[]; jobs:Job[]; voices:VoiceProfile[]; voiceAssignments:VoiceAssignment[]; dialogueClips:DialogueClip[] };
-const empty = ():State => ({projects:[],sources:[],jobs:[],voices:[],voiceAssignments:[],dialogueClips:[]});
+type State = { projects:Project[]; sources:Source[]; jobs:Job[]; voices:VoiceProfile[]; voiceAssignments:VoiceAssignment[]; dialogueClips:DialogueClip[]; subtitleTracks:SubtitleTrack[]; renderJobs:RenderJob[] };
+const empty = ():State => ({projects:[],sources:[],jobs:[],voices:[],voiceAssignments:[],dialogueClips:[],subtitleTracks:[],renderJobs:[]});
 const dataDir = path.resolve(process.env.AUREON_DATA_DIR || './storage/data');
 const statePath = path.join(dataDir,'state.json');
 let state:State = empty();
@@ -18,7 +21,7 @@ let writeChain = Promise.resolve();
 
 export async function initializeStore(){
  await mkdir(dataDir,{recursive:true});
- try { const parsed=JSON.parse(await readFile(statePath,'utf8')) as Partial<State>; state={projects:Array.isArray(parsed.projects)?parsed.projects:[],sources:Array.isArray(parsed.sources)?parsed.sources:[],jobs:Array.isArray(parsed.jobs)?parsed.jobs:[],voices:Array.isArray(parsed.voices)?parsed.voices:[],voiceAssignments:Array.isArray(parsed.voiceAssignments)?parsed.voiceAssignments:[],dialogueClips:Array.isArray(parsed.dialogueClips)?parsed.dialogueClips:[]}; }
+ try { const parsed=JSON.parse(await readFile(statePath,'utf8')) as Partial<State>; state={projects:Array.isArray(parsed.projects)?parsed.projects:[],sources:Array.isArray(parsed.sources)?parsed.sources:[],jobs:Array.isArray(parsed.jobs)?parsed.jobs:[],voices:Array.isArray(parsed.voices)?parsed.voices:[],voiceAssignments:Array.isArray(parsed.voiceAssignments)?parsed.voiceAssignments:[],dialogueClips:Array.isArray(parsed.dialogueClips)?parsed.dialogueClips:[],subtitleTracks:Array.isArray(parsed.subtitleTracks)?parsed.subtitleTracks:[],renderJobs:Array.isArray(parsed.renderJobs)?parsed.renderJobs:[]}; }
  catch(error){ if((error as NodeJS.ErrnoException).code!=='ENOENT') throw error; await persist(); }
 }
 async function persist(){
@@ -63,6 +66,13 @@ export async function addVoiceProfile(input:Omit<VoiceProfile,'id'|'createdAt'>)
 export function getDialogueClips(projectId:string){return state.dialogueClips.filter(x=>x.projectId===projectId).sort((a,b)=>a.startMs-b.startMs||a.createdAt.localeCompare(b.createdAt));}
 export function getDialogueClip(id:string){return state.dialogueClips.find(x=>x.id===id);}
 export async function addDialogueClip(input:Omit<DialogueClip,'id'|'createdAt'>){const item:DialogueClip={...input,id:randomUUID(),createdAt:new Date().toISOString()};state.dialogueClips.push(item);await persist();return item;}
+
+export function getSubtitleTrack(projectId:string){return state.subtitleTracks.find(x=>x.projectId===projectId)??{projectId,cues:[],updatedAt:''};}
+export async function saveSubtitleTrack(projectId:string,cues:StoredSubtitleCue[]){const item={projectId,cues,updatedAt:new Date().toISOString()};const index=state.subtitleTracks.findIndex(x=>x.projectId===projectId);if(index>=0)state.subtitleTracks[index]=item;else state.subtitleTracks.push(item);await persist();return item;}
+export function getRenderJobs(projectId:string){return state.renderJobs.filter(x=>x.projectId===projectId).sort((a,b)=>b.createdAt.localeCompare(a.createdAt));}
+export function getRenderJob(id:string){return state.renderJobs.find(x=>x.id===id);}
+export async function addRenderJob(input:Omit<RenderJob,'id'|'createdAt'|'updatedAt'|'progress'|'status'|'note'>){const now=new Date().toISOString();const item:RenderJob={...input,id:randomUUID(),status:'queued',progress:0,note:'Waiting for FFmpeg rendering worker.',createdAt:now,updatedAt:now};state.renderJobs.push(item);await persist();return item;}
+export async function updateRenderJob(id:string,patch:Partial<Omit<RenderJob,'id'|'projectId'|'sourceId'|'createdAt'>>){const item=getRenderJob(id);if(!item)return undefined;Object.assign(item,patch,{updatedAt:new Date().toISOString()});await persist();return item;}
 
 export function getVoiceAssignments(projectId:string){return state.voiceAssignments.filter(x=>x.projectId===projectId).sort((a,b)=>a.character.localeCompare(b.character));}
 export async function assignVoiceToCharacter(input:{projectId:string;voiceProfileId:string;character:string}){const existing=state.voiceAssignments.find(x=>x.projectId===input.projectId&&x.character.toLocaleLowerCase()===input.character.toLocaleLowerCase());if(existing){existing.voiceProfileId=input.voiceProfileId;await persist();return existing;}const item:VoiceAssignment={...input,id:randomUUID(),createdAt:new Date().toISOString()};state.voiceAssignments.push(item);await persist();return item;}

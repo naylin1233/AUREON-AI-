@@ -40,7 +40,8 @@
 - Edit Myanmar and English tracks, cue text and timestamps.
 - Export separate Myanmar/English SRT or VTT files.
 - Validate cue timestamp order.
-- Browser-side edits are not persisted to the server.
+- Myanmar and English subtitle cues are persisted per project in JSON storage.
+- SRT/VTT import and export remain available.
 - Automatic translation and speech-to-text alignment are not implemented.
 
 ### Stage 7 — Consent-gated audio transcription
@@ -70,12 +71,22 @@ docker build -t aureon-ai .
 docker run --rm -p 8787:8787 -v aureon-data:/app/storage/data aureon-ai
 ```
 
+### Stage 8 — Project subtitles and FFmpeg MP4 export
+- Saves bilingual Myanmar/English subtitle cue tracks per project.
+- Validates cue timestamps and text before persistence.
+- Queues resumable FFmpeg render jobs from an uploaded source video.
+- Mixes original dialogue clips at their millisecond timeline offsets with the source audio.
+- Muxes Myanmar and English subtitles as selectable soft subtitle tracks in MP4 (not burned-in captions).
+- Exposes render status and MP4 download endpoints.
+- Re-encodes video to H.264 and audio to AAC for MP4 compatibility.
+
 ## Not implemented yet
 - Automatic speech recognition or transcript extraction from uploaded videos.
-- Dialogue clip timeline mixing into the final video render.
+- Automatic dialogue script generation and lip-sync.
 - Automatic chunk summarization and long-video recap orchestration.
-- Automatic subtitle translation or timing alignment.
-- Scene selection, AI/3D scene generation and final recap video rendering.
+- Automatic subtitle translation or speech-to-text timing alignment.
+- Burned-in subtitle styling/position control.
+- AI/3D scene generation and automatic scene selection.
 - YouTube/Facebook/TikTok OAuth, scheduling and auto-publishing.
 - Production cloud database/object storage and Android APK packaging.
 
