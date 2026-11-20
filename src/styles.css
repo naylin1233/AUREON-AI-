@@ -33,3 +33,7 @@
 .audio-result{display:grid;gap:10px;margin-top:18px;border:1px solid #51452a;border-radius:10px;padding:15px;background:#15130f}
 .audio-result b{font-size:11px;color:#f0e5ca}
 .audio-result audio{width:100%;height:40px}
+
+.script-output{margin-top:20px;border:1px solid #554522;background:#12100d;border-radius:11px;padding:16px}
+.script-output pre{white-space:pre-wrap;overflow-wrap:anywhere;max-height:560px;overflow:auto;font:12px/1.9 system-ui,sans-serif;color:#e3d8bf;margin:16px 0}
+.secondary-button{background:#292316;border:1px solid #715c2e;color:#e7ca78;padding:9px 13px;border-radius:7px;cursor:pointer;font-size:11px}
