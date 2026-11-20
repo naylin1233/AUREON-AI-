@@ -5,6 +5,7 @@ import { mkdir } from 'node:fs/promises';
 import path from 'node:path';
 import { addJob, addProject, addSource, getJobs, getProjects, getProject, getSources, getJob, initializeStore, storageDirectory } from './store.js';
 import { enqueueMediaJob, resumePendingMediaJobs } from './mediaWorker.js';
+import { azureTtsStatus, synthesizeBurmese, type BurmeseVoice } from './tts/azureSpeech.js';
 
 const app=express();
 const port=Number(process.env.PORT||8787);
@@ -36,7 +37,24 @@ const upload=multer({storage,limits:{fileSize:uploadLimitMb*1024*1024,files:1},f
  cb(null,true);
 }});
 const modes=new Set(['Cinematic','Dialogue Breakdown','Narrator Story','Full Deep Dive','Short Viral 60s']);
-app.get('/api/health',(_req,res)=>res.json({ok:true,service:'AUREON AI API',version:'0.3.0',features:{projects:true,localUpload:true,durableJsonStore:true,mediaPreparation:true,aiGeneration:false,burmeseTts:false,videoRendering:false,oauthPublishing:false}}));
+app.get('/api/health',(_req,res)=>res.json({ok:true,service:'AUREON AI API',version:'0.3.0',features:{projects:true,localUpload:true,durableJsonStore:true,mediaPreparation:true,aiGeneration:false,burmeseTts:azureTtsStatus().configured,videoRendering:false,oauthPublishing:false}}));
+app.get('/api/tts/status',(_req,res)=>res.json(azureTtsStatus()));
+app.post('/api/tts/synthesize',async(req,res,next)=>{
+ try{
+  const text=typeof req.body?.text==='string'?req.body.text.trim():'';
+  const voice=typeof req.body?.voice==='string'?req.body.voice:'Nilar';
+  if(!text||text.length>4500)return res.status(400).json({error:'Myanmar narration text is required (maximum 4,500 characters per request).'});
+  if(voice!=='Nilar'&&voice!=='Thiha')return res.status(400).json({error:'Choose one of the supported Burmese voices.'});
+  if(!azureTtsStatus().configured)return res.status(503).json({error:'Myanmar TTS is not configured. Add the Azure Speech F0 key and region to server environment settings.'});
+  const result=await synthesizeBurmese(text,voice as BurmeseVoice);
+  res.status(201).json({item:{...result,audioUrl:`/api/tts/audio/${result.id}`,language:'my-MM'}});
+ }catch(e){next(e)}
+});
+app.get('/api/tts/audio/:id',(req,res)=>{
+ const id=String(req.params.id);
+ if(!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id))return res.status(400).json({error:'Invalid audio id.'});
+ res.type('audio/mpeg').sendFile(path.join(storageDirectory(),'tts',id+'.mp3'),error=>{if(error&&!res.headersSent)res.status(404).json({error:'Audio file not found.'});});
+});
 app.get('/api/projects',(_req,res)=>res.json({items:getProjects()}));
 app.post('/api/projects',async(req,res,next)=>{
  try{const title=typeof req.body?.title==='string'?req.body.title.trim():'';const recapMode=typeof req.body?.recapMode==='string'?req.body.recapMode:'Cinematic';
