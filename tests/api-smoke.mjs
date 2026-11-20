@@ -37,7 +37,9 @@ try{
  assert.equal(health.features.aiScriptGeneration,false);
  const aiStatus=await (await fetch(base+'/api/ai/status')).json();
  assert.equal(aiStatus.configured,false);
- const aiUnavailable=await fetch(base+'/api/ai/recap-script',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({transcript:'ဇာတ်လမ်းအကျဉ်း',recapMode:'Cinematic'})});
+ const aiNoConsent=await fetch(base+'/api/ai/recap-script',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({transcript:'ဇာတ်လမ်းအကျဉ်း',recapMode:'Cinematic',consent:false})});
+ assert.equal(aiNoConsent.status,400);
+ const aiUnavailable=await fetch(base+'/api/ai/recap-script',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({transcript:'ဇာတ်လမ်းအကျဉ်း',recapMode:'Cinematic',consent:true})});
  assert.equal(aiUnavailable.status,503);
  const aiInvalid=await fetch(base+'/api/ai/recap-script',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({transcript:'',recapMode:'Cinematic'})});
  assert.equal(aiInvalid.status,400);
