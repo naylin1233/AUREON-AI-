@@ -80,7 +80,24 @@ export function adminSessionIsValid(req: Request) {
   return verifySessionToken(readCookie(req, sessionCookieName));
 }
 
+export function requestOriginIsAllowed(req: Request) {
+  const origin = req.get('origin');
+  if (!origin) return true;
+  try {
+    const parsed = new URL(origin);
+    return parsed.host === req.get('host') ||
+      origin === 'http://127.0.0.1:5173' ||
+      origin === 'http://localhost:5173';
+  } catch {
+    return false;
+  }
+}
+
 export function requireAdminSession(req: Request, res: Response, next: NextFunction) {
-  if (!authIsConfigured() || adminSessionIsValid(req)) return next();
+  if (!authIsConfigured()) return next();
+  if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method) && !requestOriginIsAllowed(req)) {
+    return res.status(403).json({ error: 'Cross-origin request is not allowed.' });
+  }
+  if (adminSessionIsValid(req)) return next();
   res.status(401).json({ error: 'Login required.' });
 }
