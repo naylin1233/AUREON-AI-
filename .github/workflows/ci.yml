@@ -34,3 +34,5 @@ jobs:
           npm run build
           npm test
           npm run test:subtitles
+      - name: Build Docker image
+        run: docker build --tag aureon-ai:ci .
