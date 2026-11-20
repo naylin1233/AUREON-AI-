@@ -80,7 +80,7 @@ export async function discoverYouTubeReferences(projectIds: string[], customQuer
           kind,
           url,
           title: (snippet.title || '').slice(0, 160),
-          channelName: (kind === 'channel' ? snippet.title : snippet.channelTitle || '').slice(0, 100),
+          channelName: ((kind === 'channel' ? snippet.title : snippet.channelTitle) || '').slice(0, 100),
           language: 'Unknown',
           notes: `Automatically discovered from keyword: ${query}. Video search is ordered by YouTube view count; channel search is relevance-ranked. Metadata only; review the source and its rights before using any material.`
         });
