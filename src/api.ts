@@ -8,7 +8,7 @@ export type SubtitleCue = {id:string;start:string;end:string;myanmar:string;engl
 export type SubtitleTrack = {projectId:string;cues:SubtitleCue[];updatedAt:string};
 export type RenderJob = {id:string;projectId:string;sourceId:string;status:'queued'|'rendering'|'completed'|'failed';progress:number;note:string;includeDialogue:boolean;includeMyanmar:boolean;includeEnglish:boolean;durationSeconds?:number;error?:string;createdAt:string;updatedAt:string;videoUrl?:string};
 export type RecapScript = {script:string;model:string;interactionId?:string;usage?:{total_tokens?:number;total_input_tokens?:number;total_output_tokens?:number}};
-export type Job = {id:string;projectId:string;sourceId?:string;kind:'recap';status:'queued'|'processing'|'media_ready'|'transcribing'|'transcribed'|'failed'|'awaiting_pipeline';stage:string;progress:number;note:string;error?:string;outputDir?:string;chunkCount?:number;durationSeconds?:number;transcript?:string;transcriptChunks?:string[];transcribedChunkCount?:number;transcriptionTotalChunks?:number;createdAt:string;updatedAt:string};
+export type Job = {id:string;projectId:string;sourceId?:string;kind:'recap';status:'queued'|'processing'|'media_ready'|'transcribing'|'transcribed'|'failed'|'awaiting_pipeline';stage:string;progress:number;note:string;error?:string;outputDir?:string;chunkCount?:number;durationSeconds?:number;transcript?:string;recapScript?:string;recapScriptModel?:string;recapScriptGeneratedAt?:string;transcriptChunks?:string[];transcribedChunkCount?:number;transcriptionTotalChunks?:number;createdAt:string;updatedAt:string};
 async function request<T>(url:string,init?:RequestInit):Promise<T>{
  const response=await fetch(url,init);
  const data=await response.json().catch(()=>({error:'Invalid API response'}));
