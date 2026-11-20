@@ -61,3 +61,8 @@
 
 .ai-consent{display:flex;align-items:flex-start;gap:10px;margin:12px 0 18px;padding:12px;border:1px solid #5a4928;border-radius:8px;background:#17140e;color:#c9bc9b;font-size:10px;line-height:1.7}
 .ai-consent input{flex:0 0 auto;margin-top:3px;accent-color:#d5ad4d}
+
+.transcription-panel{display:flex;flex-direction:column;gap:10px;margin-top:14px;padding:12px;border:1px solid #554522;border-radius:9px;background:#17140e}
+.transcription-panel .ai-consent{margin:0}
+.job-state.transcribing{color:#f0d47b;background:#3c311b}
+.job-state.transcribed{color:#a9d39b;background:#263722}
