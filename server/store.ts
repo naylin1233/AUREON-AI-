@@ -4,10 +4,11 @@ import path from 'node:path';
 
 export type Project = { id:string; title:string; recapMode:string; createdAt:string; sourceIds:string[] };
 export type Source = { id:string; projectId:string; kind:'upload'|'url'; name:string; path?:string; url?:string; mimeType?:string; size?:number; status:'stored'|'awaiting_review'; createdAt:string };
+export type VoiceProfile = {id:string;name:string;character:string;language:'my-MM';fileName:string;path:string;mimeType:string;size:number;consentConfirmed:true;createdAt:string};
 export type JobStatus = 'queued'|'processing'|'media_ready'|'transcribing'|'transcribed'|'failed'|'awaiting_pipeline';
 export type Job = { id:string; projectId:string; sourceId?:string; kind:'recap'; status:JobStatus; stage:string; progress:number; note:string; error?:string; outputDir?:string; durationSeconds?:number; chunkCount?:number; transcript?:string; transcriptChunks?:string[]; transcriptionConsentAt?:string; transcribedChunkCount?:number; transcriptionTotalChunks?:number; createdAt:string; updatedAt:string };
-type State = { projects:Project[]; sources:Source[]; jobs:Job[] };
-const empty = ():State => ({projects:[],sources:[],jobs:[]});
+type State = { projects:Project[]; sources:Source[]; jobs:Job[]; voices:VoiceProfile[] };
+const empty = ():State => ({projects:[],sources:[],jobs:[],voices:[]});
 const dataDir = path.resolve(process.env.AUREON_DATA_DIR || './storage/data');
 const statePath = path.join(dataDir,'state.json');
 let state:State = empty();
@@ -15,7 +16,7 @@ let writeChain = Promise.resolve();
 
 export async function initializeStore(){
  await mkdir(dataDir,{recursive:true});
- try { const parsed=JSON.parse(await readFile(statePath,'utf8')) as Partial<State>; state={projects:Array.isArray(parsed.projects)?parsed.projects:[],sources:Array.isArray(parsed.sources)?parsed.sources:[],jobs:Array.isArray(parsed.jobs)?parsed.jobs:[]}; }
+ try { const parsed=JSON.parse(await readFile(statePath,'utf8')) as Partial<State>; state={projects:Array.isArray(parsed.projects)?parsed.projects:[],sources:Array.isArray(parsed.sources)?parsed.sources:[],jobs:Array.isArray(parsed.jobs)?parsed.jobs:[],voices:Array.isArray(parsed.voices)?parsed.voices:[]}; }
  catch(error){ if((error as NodeJS.ErrnoException).code!=='ENOENT') throw error; await persist(); }
 }
 async function persist(){
@@ -49,3 +50,10 @@ export async function updateJob(id:string,patch:Partial<Omit<Job,'id'|'projectId
  Object.assign(item,patch,{updatedAt:new Date().toISOString()});await persist();return item;
 }
 export function storageDirectory(){return dataDir;}
+
+export function getVoiceProfiles(){return [...state.voices].sort((a,b)=>b.createdAt.localeCompare(a.createdAt));}
+export function getVoiceProfile(id:string){return state.voices.find(x=>x.id===id);}
+export async function addVoiceProfile(input:Omit<VoiceProfile,'id'|'createdAt'>){
+ const item:VoiceProfile={...input,id:randomUUID(),createdAt:new Date().toISOString()};
+ state.voices.push(item);await persist();return item;
+}
