@@ -97,3 +97,7 @@ Set `GEMINI_API_KEY` in the private server environment. Fixed model: `gemini-3.8
 Set `AZURE_SPEECH_KEY` and `AZURE_SPEECH_REGION` in the private server environment. Use the free tier only unless a paid plan is separately approved. Live synthesis requires valid credentials and has not yet been verified.
 
 Official references: [Gemini Interactions API](https://ai.google.dev/gemini-api/docs/get-started) · [Azure Burmese voice list](https://learn.microsoft.com/en-us/azure/ai-services/speech-service/language-support)
+
+## Actor Voice Library
+
+The Myanmar Voice Studio supports adding consented actor recordings as named character voice references. Supported uploads: MP3, WAV, M4A, OGG, WEBM, AAC and FLAC (maximum 30 MB each). Profiles are stored locally under `storage/data/voice-profiles/` with a character/role label and an in-app audio preview. The uploader must confirm ownership or permission from the voice owner. These are original recordings only: the current system does not clone the actor's voice or synthesize new lines in that actor's voice, and it does not yet insert these clips into the video dialogue timeline.
