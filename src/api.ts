@@ -20,7 +20,7 @@ export const api={
  job:(id:string)=>request<{item:Job}>(`/api/jobs/${id}`),
  jobs:()=>request<{items:Job[]}>('/api/jobs'),
  aiStatus:()=>request<{configured:boolean;model:string;provider:string}>('/api/ai/status'),
- generateRecapScript:(transcript:string,recapMode:string,title:string)=>request<{item:RecapScript;note:string}>('/api/ai/recap-script',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({transcript,recapMode,title})}),
+ generateRecapScript:(transcript:string,recapMode:string,title:string,consent:boolean)=>request<{item:RecapScript;note:string}>('/api/ai/recap-script',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({transcript,recapMode,title,consent})}),
  ttsStatus:()=>request<{configured:boolean;language:string;voices:{label:TtsVoice;id:string}[]}>('/api/tts/status'),
  synthesize:(text:string,voice:TtsVoice)=>request<{item:{id:string;bytes:number;voice:string;audioUrl:string;language:string}}>('/api/tts/synthesize',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text,voice})})
 };
