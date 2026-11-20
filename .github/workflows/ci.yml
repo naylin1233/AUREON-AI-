@@ -2,7 +2,7 @@ name: AUREON AI CI
 
 on:
   push:
-    branches: ["main", "stage-1/**"]
+    branches: ["main", "stage-1/**", "stage-2/**"]
   pull_request:
     branches: ["main"]
 
@@ -15,9 +15,9 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
       - name: Install dependencies
-        run: npm install
+        run: npm install --no-audit --no-fund
       - name: Typecheck and build
         run: npm run build
