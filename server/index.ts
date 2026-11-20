@@ -6,6 +6,7 @@ import path from 'node:path';
 import { addJob, addProject, addSource, getJobs, getProjects, getProject, getSources, getJob, initializeStore, storageDirectory } from './store.js';
 import { enqueueMediaJob, resumePendingMediaJobs } from './mediaWorker.js';
 import { azureTtsStatus, synthesizeBurmese, type BurmeseVoice } from './tts/azureSpeech.js';
+import { geminiStatus, generateBurmeseRecap } from './ai/gemini.js';
 
 const app=express();
 const port=Number(process.env.PORT||8787);
@@ -37,8 +38,21 @@ const upload=multer({storage,limits:{fileSize:uploadLimitMb*1024*1024,files:1},f
  cb(null,true);
 }});
 const modes=new Set(['Cinematic','Dialogue Breakdown','Narrator Story','Full Deep Dive','Short Viral 60s']);
-app.get('/api/health',(_req,res)=>res.json({ok:true,service:'AUREON AI API',version:'0.3.0',features:{projects:true,localUpload:true,durableJsonStore:true,mediaPreparation:true,aiGeneration:false,burmeseTts:azureTtsStatus().configured,videoRendering:false,oauthPublishing:false}}));
+app.get('/api/health',(_req,res)=>res.json({ok:true,service:'AUREON AI API',version:'0.3.0',features:{projects:true,localUpload:true,durableJsonStore:true,mediaPreparation:true,aiGeneration:geminiStatus().configured,aiScriptGeneration:geminiStatus().configured,burmeseTts:azureTtsStatus().configured,videoRendering:false,oauthPublishing:false}}));
 app.get('/api/tts/status',(_req,res)=>res.json(azureTtsStatus()));
+app.get('/api/ai/status',(_req,res)=>res.json(geminiStatus()));
+app.post('/api/ai/recap-script',async(req,res,next)=>{
+ try{
+  const transcript=typeof req.body?.transcript==='string'?req.body.transcript.trim():'';
+  const recapMode=typeof req.body?.recapMode==='string'?req.body.recapMode:'Cinematic';
+  const title=typeof req.body?.title==='string'?req.body.title.trim().slice(0,120):undefined;
+  if(!transcript||transcript.length>30000)return res.status(400).json({error:'Paste a transcript (maximum 30,000 characters).'});
+  if(!modes.has(recapMode))return res.status(400).json({error:'Invalid recap mode.'});
+  if(!geminiStatus().configured)return res.status(503).json({error:'AI recap is not configured. Add GEMINI_API_KEY to the private server environment.'});
+  const result=await generateBurmeseRecap({transcript,mode:recapMode,title});
+  res.status(201).json({item:result,note:'Draft generated from the transcript you provided. Review names and story details before using it.'});
+ }catch(e){next(e)}
+});
 app.post('/api/tts/synthesize',async(req,res,next)=>{
  try{
   const text=typeof req.body?.text==='string'?req.body.text.trim():'';
@@ -93,6 +107,8 @@ app.use((error:unknown,_req:Request,res:Response,_next:NextFunction)=>{
  const err=error as Error & {code?:string};
  if(err instanceof multer.MulterError)return res.status(err.code==='LIMIT_FILE_SIZE'?413:400).json({error:err.code==='LIMIT_FILE_SIZE'?`File exceeds ${uploadLimitMb} MB upload limit.`:err.message});
  if(err.message.startsWith('Unsupported video type'))return res.status(415).json({error:err.message});
+ if(err.message.startsWith('AI recap is not configured'))return res.status(503).json({error:err.message});
+ if(err.message.startsWith('Gemini request failed'))return res.status(502).json({error:err.message});
  if(err.message.startsWith('Myanmar TTS is not configured'))return res.status(503).json({error:err.message});
  if(err.message.startsWith('Azure Speech request failed'))return res.status(502).json({error:err.message});
  res.status(500).json({error:err.message||'Internal server error.'});
