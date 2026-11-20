@@ -39,7 +39,7 @@ For a public deployment, configure a strong `AUREON_API_TOKEN`, HTTPS and a trus
 Local data lives under `storage/data/` (ignored by Git). Uploaded files are under `uploads/`; extracted chunks are under `processed/<job-id>/`. Back up this directory. A two-hour source creates approximately twelve ten-minute WAV chunks. Chunk extraction is actual FFmpeg work; it is not AI transcription or recap generation.
 
 ## Not implemented yet
-No automatic speech recognition/transcript extraction, long-video transcript orchestration, Myanmar TTS voice cloning, scene-aware video editing/rendering, subtitle alignment/export, distributed job queue, remote URL downloading, cloud object storage, managed database, social OAuth, scheduled/automatic publishing, or Android package. Jobs reach `media_ready` only after audio extraction; AI recap generation has not started.
+No automatic speech recognition/transcript extraction, long-video transcript orchestration, Myanmar TTS voice cloning, scene-aware video editing/rendering, subtitle alignment/export, distributed job queue, remote URL downloading, cloud object storage, managed database, social OAuth, scheduled/automatic publishing, or Android package. Jobs reach `media_ready` only after audio extraction. Gemini script generation accepts a manually supplied transcript; video transcription and recap rendering have not started.
 
 ## Safety and cost
 - Bind to localhost by default; do not expose the development server publicly.
@@ -57,6 +57,6 @@ Set `AZURE_SPEECH_KEY` and `AZURE_SPEECH_REGION` in the private server environme
 
 ## Gemini recap-script configuration
 
-Set `GEMINI_API_KEY` in the private server environment. Optional model override: `GEMINI_MODEL` (default `gemini-3.8-flash`). The API accepts a user-provided transcript up to 30,000 characters and returns a Burmese draft in the selected recap mode. Transcripts are sent to Google for processing and are not stored by this endpoint. Do not submit private or sensitive material without appropriate permission. Check current model access and free-tier quota first; no paid billing is enabled by this app.
+Set `GEMINI_API_KEY` in the private server environment. Fixed model: `gemini-3.8-flash` (no paid-model override). The API accepts a user-provided transcript up to 30,000 characters and returns a Burmese draft in the selected recap mode. The API requires explicit user consent before sending. Transcripts are sent to Google for processing and are not stored by this endpoint. Google states that Free Tier content may be used to improve its products. Do not submit private or sensitive material without appropriate permission. Check current model access and free-tier quota first; no paid billing is enabled by this app.
 
 This is transcript-to-script generation only. It does not transcribe uploaded audio or automatically produce a complete recap video.
