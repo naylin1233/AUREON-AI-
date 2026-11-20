@@ -47,6 +47,10 @@ No automatic speech recognition/transcript extraction, long-video transcript orc
 - Process only media the user owns or is authorized to use.
 - Free-tier-first; do not enable paid billing without explicit approval.
 
+## Subtitle workspace
+
+The browser-side subtitle editor imports SRT/WebVTT, maintains separate Myanmar and English text tracks matched by timestamps, and exports each language to SRT or WebVTT. It is a manual editing tool; it does not automatically transcribe, translate, or align speech.
+
 ## Burmese TTS configuration
 
 Set `AZURE_SPEECH_KEY` and `AZURE_SPEECH_REGION` in the private server environment to enable the standard Burmese voices `my-MM-NilarNeural` and `my-MM-ThihaNeural`. The integration returns a clear 503 while credentials are absent and never falls back to English. Use the Azure Free (F0) tier only; do not upgrade to a paid tier without explicit approval. Live audio generation has not been verified until a valid resource is configured. Personal voice cloning is not included.
