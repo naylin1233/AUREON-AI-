@@ -5,19 +5,24 @@
 ## Current stage
 
 ### Stage 1 — Web UI
-Responsive Burmese-first React + TypeScript + Vite dashboard with recap modes, video library, subtitle, voice, and social publishing sections.
+Responsive Burmese-first React + TypeScript + Vite dashboard with five recap modes, video library, subtitle, voice and publishing sections.
 
-### Stage 2 — Local backend foundation
-- Express API health check and Vite development proxy.
-- Project creation and JSON-backed persistence.
-- Local video upload with MIME allow-list and configurable size limit.
-- Authorized URL metadata registration (does not download remote files).
-- Recap job records persisted as `awaiting_pipeline` until a real worker exists.
+### Stage 2 — Local backend
+- Express API, JSON-backed project/source/job persistence.
+- Local video uploads with MIME allow-list and configurable size limit.
+- Authorized URL metadata registration (no remote download).
 - Optional bearer-token API protection.
+
+### Stage 3 — Real media preparation
+- FFmpeg/FFprobe validates uploaded video duration and audio stream.
+- Extracts mono 16 kHz WAV audio into 10-minute chunks, supporting long source videos.
+- Stores job status, progress, output path, chunk count and failure details.
+- Resumes queued/processing jobs after server restart.
+- Docker runtime includes FFmpeg and a persistent data volume.
 
 ## Run locally
 
-Requirements: Node.js 20+
+Requirements: Node.js 20+ and FFmpeg/FFprobe on PATH.
 
 ```bash
 npm install
@@ -25,16 +30,22 @@ cp .env.example .env
 npm run dev
 ```
 
-Open http://127.0.0.1:5173. API health is at http://127.0.0.1:8787/api/health.
+Open http://127.0.0.1:5173. API health: http://127.0.0.1:8787/api/health.
 
-## Important capability boundary
+## Docker
 
-The project is **not yet a complete AI video production system**. AI story analysis/script generation, real Myanmar TTS, personal voice support, scene extraction, 1–2 hour resumable video processing, rendering, subtitle synchronization/export, durable worker queue, cloud storage, OAuth, automatic publishing, and Android packaging are not yet implemented or verified. Jobs created by this version remain `awaiting_pipeline`; the UI must not imply that generation has started.
+```bash
+docker build -t aureon-ai .
+docker run --rm -p 8787:8787 -v aureon-data:/app/storage/data aureon-ai
+```
+
+## Capability boundary
+
+The FFmpeg audio preparation pipeline is implemented and covered by CI smoke tests. It does **not** perform AI story analysis, script generation, transcription, Myanmar TTS, voice cloning, scene-aware video editing, final video rendering, subtitle synchronization/export, remote URL downloads, cloud storage, managed database, social OAuth, automatic publishing or Android packaging. A job marked `media_ready` means audio chunks were extracted, not that a recap video was generated.
 
 ## Principles
-
-- Free-tier-first. No paid billing without explicit approval.
-- Only process videos the user owns or is authorized to use.
-- Keep provider keys and OAuth secrets on the server; never commit them.
-- Bind local development server to localhost. Do not deploy publicly without production authentication, HTTPS, rate limiting, persistent database and object storage.
-- Verify each integration end-to-end before showing it as active.
+- Free-tier-first; no paid billing without explicit approval.
+- Process only videos the user owns or is authorized to use.
+- Keep API/provider keys and OAuth secrets server-side.
+- Development server binds to localhost. Public deployment needs production authentication, HTTPS, rate limits, managed database and object storage.
+- Verify every integration end-to-end before showing it as active.
