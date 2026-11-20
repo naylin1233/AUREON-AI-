@@ -5,11 +5,12 @@ import path from 'node:path';
 export type Project = { id:string; title:string; recapMode:string; createdAt:string; sourceIds:string[] };
 export type Source = { id:string; projectId:string; kind:'upload'|'url'; name:string; path?:string; url?:string; mimeType?:string; size?:number; status:'stored'|'awaiting_review'; createdAt:string };
 export type VoiceAssignment = {id:string;projectId:string;voiceProfileId:string;character:string;createdAt:string};
+export type DialogueClip = {id:string;projectId:string;character:string;voiceAssignmentId?:string;fileName:string;path:string;mimeType:string;size:number;durationSeconds:number;startMs:number;createdAt:string};
 export type VoiceProfile = {id:string;name:string;character:string;language:'my-MM';fileName:string;path:string;mimeType:string;size:number;consentConfirmed:true;createdAt:string};
 export type JobStatus = 'queued'|'processing'|'media_ready'|'transcribing'|'transcribed'|'failed'|'awaiting_pipeline';
 export type Job = { id:string; projectId:string; sourceId?:string; kind:'recap'; status:JobStatus; stage:string; progress:number; note:string; error?:string; outputDir?:string; durationSeconds?:number; chunkCount?:number; transcript?:string; transcriptChunks?:string[]; transcriptionConsentAt?:string; transcribedChunkCount?:number; transcriptionTotalChunks?:number; createdAt:string; updatedAt:string };
-type State = { projects:Project[]; sources:Source[]; jobs:Job[]; voices:VoiceProfile[]; voiceAssignments:VoiceAssignment[] };
-const empty = ():State => ({projects:[],sources:[],jobs:[],voices:[],voiceAssignments:[]});
+type State = { projects:Project[]; sources:Source[]; jobs:Job[]; voices:VoiceProfile[]; voiceAssignments:VoiceAssignment[]; dialogueClips:DialogueClip[] };
+const empty = ():State => ({projects:[],sources:[],jobs:[],voices:[],voiceAssignments:[],dialogueClips:[]});
 const dataDir = path.resolve(process.env.AUREON_DATA_DIR || './storage/data');
 const statePath = path.join(dataDir,'state.json');
 let state:State = empty();
@@ -17,7 +18,7 @@ let writeChain = Promise.resolve();
 
 export async function initializeStore(){
  await mkdir(dataDir,{recursive:true});
- try { const parsed=JSON.parse(await readFile(statePath,'utf8')) as Partial<State>; state={projects:Array.isArray(parsed.projects)?parsed.projects:[],sources:Array.isArray(parsed.sources)?parsed.sources:[],jobs:Array.isArray(parsed.jobs)?parsed.jobs:[],voices:Array.isArray(parsed.voices)?parsed.voices:[],voiceAssignments:Array.isArray(parsed.voiceAssignments)?parsed.voiceAssignments:[]}; }
+ try { const parsed=JSON.parse(await readFile(statePath,'utf8')) as Partial<State>; state={projects:Array.isArray(parsed.projects)?parsed.projects:[],sources:Array.isArray(parsed.sources)?parsed.sources:[],jobs:Array.isArray(parsed.jobs)?parsed.jobs:[],voices:Array.isArray(parsed.voices)?parsed.voices:[],voiceAssignments:Array.isArray(parsed.voiceAssignments)?parsed.voiceAssignments:[],dialogueClips:Array.isArray(parsed.dialogueClips)?parsed.dialogueClips:[]}; }
  catch(error){ if((error as NodeJS.ErrnoException).code!=='ENOENT') throw error; await persist(); }
 }
 async function persist(){
@@ -58,6 +59,10 @@ export async function addVoiceProfile(input:Omit<VoiceProfile,'id'|'createdAt'>)
  const item:VoiceProfile={...input,id:randomUUID(),createdAt:new Date().toISOString()};
  state.voices.push(item);await persist();return item;
 }
+
+export function getDialogueClips(projectId:string){return state.dialogueClips.filter(x=>x.projectId===projectId).sort((a,b)=>a.startMs-b.startMs||a.createdAt.localeCompare(b.createdAt));}
+export function getDialogueClip(id:string){return state.dialogueClips.find(x=>x.id===id);}
+export async function addDialogueClip(input:Omit<DialogueClip,'id'|'createdAt'>){const item:DialogueClip={...input,id:randomUUID(),createdAt:new Date().toISOString()};state.dialogueClips.push(item);await persist();return item;}
 
 export function getVoiceAssignments(projectId:string){return state.voiceAssignments.filter(x=>x.projectId===projectId).sort((a,b)=>a.character.localeCompare(b.character));}
 export async function assignVoiceToCharacter(input:{projectId:string;voiceProfileId:string;character:string}){const existing=state.voiceAssignments.find(x=>x.projectId===input.projectId&&x.character.toLocaleLowerCase()===input.character.toLocaleLowerCase());if(existing){existing.voiceProfileId=input.voiceProfileId;await persist();return existing;}const item:VoiceAssignment={...input,id:randomUUID(),createdAt:new Date().toISOString()};state.voiceAssignments.push(item);await persist();return item;}
