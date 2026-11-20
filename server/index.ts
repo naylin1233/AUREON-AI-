@@ -3,10 +3,11 @@ import multer from 'multer';
 import { randomUUID } from 'node:crypto';
 import { mkdir } from 'node:fs/promises';
 import path from 'node:path';
-import { addJob, addProject, addSource, getJobs, getProjects, getProject, getSources, getJob, initializeStore, storageDirectory } from './store.js';
+import { addJob, addProject, addSource, getJobs, getProjects, getProject, getSources, getJob, updateJob, initializeStore, storageDirectory } from './store.js';
 import { enqueueMediaJob, resumePendingMediaJobs } from './mediaWorker.js';
 import { azureTtsStatus, synthesizeBurmese, type BurmeseVoice } from './tts/azureSpeech.js';
 import { geminiStatus, generateBurmeseRecap } from './ai/gemini.js';
+import { enqueueTranscriptionJob, resumePendingTranscriptionJobs } from './ai/transcriptionWorker.js';
 
 const app=express();
 const port=Number(process.env.PORT||8787);
@@ -38,7 +39,7 @@ const upload=multer({storage,limits:{fileSize:uploadLimitMb*1024*1024,files:1},f
  cb(null,true);
 }});
 const modes=new Set(['Cinematic','Dialogue Breakdown','Narrator Story','Full Deep Dive','Short Viral 60s']);
-app.get('/api/health',(_req,res)=>res.json({ok:true,service:'AUREON AI API',version:'0.6.0',features:{projects:true,localUpload:true,durableJsonStore:true,mediaPreparation:true,aiGeneration:geminiStatus().configured,aiScriptGeneration:geminiStatus().configured,burmeseTts:azureTtsStatus().configured,videoRendering:false,oauthPublishing:false}}));
+app.get('/api/health',(_req,res)=>res.json({ok:true,service:'AUREON AI API',version:'0.6.0',features:{projects:true,localUpload:true,durableJsonStore:true,mediaPreparation:true,aiGeneration:geminiStatus().configured,aiScriptGeneration:geminiStatus().configured,audioTranscription:geminiStatus().configured,burmeseTts:azureTtsStatus().configured,videoRendering:false,oauthPublishing:false}}));
 app.get('/api/tts/status',(_req,res)=>res.json(azureTtsStatus()));
 app.get('/api/ai/status',(_req,res)=>res.json(geminiStatus()));
 app.post('/api/ai/recap-script',async(req,res,next)=>{
@@ -103,13 +104,26 @@ app.post('/api/projects/:id/recap-jobs',async(req,res,next)=>{
 });
 app.get('/api/jobs',(_req,res)=>res.json({items:getJobs()}));
 app.get('/api/jobs/:id',(req,res)=>{const item=getJob(String(req.params.id));if(!item)return res.status(404).json({error:'Job not found.'});res.json({item});});
+app.post('/api/jobs/:id/transcribe',async(req,res,next)=>{
+ try{
+  const id=String(req.params.id);const job=getJob(id);
+  if(!job)return res.status(404).json({error:'Job not found.'});
+  if(req.body?.consent!==true)return res.status(400).json({error:'Confirm the Google Gemini Free Tier audio data-use notice before sending audio.'});
+  if(!geminiStatus().configured)return res.status(503).json({error:'Audio transcription is not configured. Add GEMINI_API_KEY to the private server environment.'});
+  if(job.status==='transcribed')return res.json({item:job,note:'This job already has a transcript.'});
+  if(!job.outputDir||!['media_ready','failed','transcribing'].includes(job.status))return res.status(409).json({error:'Complete media preparation before starting audio transcription.'});
+  await updateJob(id,{status:'transcribing',stage:'transcription_queued',transcriptionConsentAt:job.transcriptionConsentAt||new Date().toISOString(),error:undefined,note:'Audio transcription queued. Completed chunks will be reused.'});
+  void enqueueTranscriptionJob(id);
+  res.status(202).json({item:getJob(id),note:'Audio transcription queued. The video audio will be sent to Google Gemini under the consent you confirmed.'});
+ }catch(e){next(e)}
+});
 app.use(express.static(path.resolve(process.cwd(),'dist')));
 app.use((error:unknown,_req:Request,res:Response,_next:NextFunction)=>{
  const err=error as Error & {code?:string};
  if(err instanceof multer.MulterError)return res.status(err.code==='LIMIT_FILE_SIZE'?413:400).json({error:err.code==='LIMIT_FILE_SIZE'?`File exceeds ${uploadLimitMb} MB upload limit.`:err.message});
  if(err.message.startsWith('Unsupported video type'))return res.status(415).json({error:err.message});
  if(err.message.startsWith('AI recap is not configured'))return res.status(503).json({error:err.message});
- if(err.message.startsWith('Gemini request failed'))return res.status(502).json({error:err.message});
+ if(err.message.startsWith('Gemini request failed')||err.message.startsWith('Gemini transcription failed'))return res.status(502).json({error:err.message});
  if(err.message.startsWith('Myanmar TTS is not configured'))return res.status(503).json({error:err.message});
  if(err.message.startsWith('Azure Speech request failed'))return res.status(502).json({error:err.message});
  res.status(500).json({error:err.message||'Internal server error.'});
@@ -117,4 +131,5 @@ app.use((error:unknown,_req:Request,res:Response,_next:NextFunction)=>{
 await initializeStore();
 await mkdir(uploadsDir,{recursive:true});
 await resumePendingMediaJobs();
+await resumePendingTranscriptionJobs();
 app.listen(port,host,()=>console.log(`AUREON API listening on http://${host}:${port}`));
