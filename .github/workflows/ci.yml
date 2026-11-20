@@ -30,3 +30,4 @@ jobs:
         run: |
           npm run build
           npm run test:api
+          npm run test:subtitles
