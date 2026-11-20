@@ -80,7 +80,15 @@ docker run --rm -p 8787:8787 -v aureon-data:/app/storage/data aureon-ai
 - Exposes render status and MP4 download endpoints.
 - Re-encodes video to H.264 and audio to AAC for MP4 compatibility.
 
-## Foreign YouTube recap references\n\n- Save public YouTube channel or video URLs against a project, with language, title, channel name and private notes.\n- URL references are metadata only: the app does not download videos, audio, captions, transcripts or channel content.\n- Mark a source as authorized only when you actually own it or hold the necessary license/permission. A checkbox is a declaration, not a legal verification. Reference-only sources may inform high-level format research, but scripts and edits must be original and must not reproduce another creator's narration, wording or edit.\n\n## Not implemented yet
+## Foreign YouTube recap references\n\n- Save public YouTube channel or video URLs against a project, with language, title, channel name and private notes.\n- URL references are metadata only: the app does not download videos, audio, captions, transcripts or channel content.\n- Mark a source as authorized only when you actually own it or hold the necessary license/permission. A checkbox is a declaration, not a legal verification. Reference-only sources may inform high-level format research, but scripts and edits must be original and must not reproduce another creator's narration, wording or edit.\n\n### Stage 9 — Transcript-to-Burmese recap script
+- A completed transcription job can generate a Burmese recap script directly from its saved transcript.
+- Uses the recap mode and project title already selected for that project.
+- Requires a separate explicit consent action before sending the transcript to Google Gemini.
+- Saves the generated script, model name and generation timestamp on the job record for later review.
+- Script generation is available only after the job reaches the `transcribed` state.
+- This creates a reviewable script draft; it does not create narration audio or a finished recap video.
+
+## Not implemented yet
 - Automatic speech recognition or transcript extraction from uploaded videos.
 - Automatic dialogue script generation and lip-sync.
 - Automatic chunk summarization and long-video recap orchestration.
