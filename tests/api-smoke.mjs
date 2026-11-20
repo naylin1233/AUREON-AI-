@@ -53,6 +53,8 @@ try{
  assert.equal(ttsNoConsent.status,400);
  const ttsUnavailable=await fetch(base+'/api/tts/synthesize',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:'မင်္ဂလာပါ',voice:'Nilar',consent:true})});
  assert.equal(ttsUnavailable.status,503);
+ const invalidActorForm=new FormData();invalidActorForm.append('name','Bad Actor');invalidActorForm.append('character','Fake');invalidActorForm.append('consent','true');invalidActorForm.append('audio',new Blob(['not audio'],{type:'audio/wav'}),'fake.wav');
+ const invalidActor=await fetch(base+'/api/voices',{method:'POST',body:invalidActorForm});assert.equal(invalidActor.status,415);
  const actorForm=new FormData();actorForm.append('name','Smoke Actor');actorForm.append('character','Test Hero');actorForm.append('consent','true');actorForm.append('audio',new Blob([await readFile(sampleVoice)],{type:'audio/wav'}),'actor.wav');
  const actorResponse=await fetch(base+'/api/voices',{method:'POST',body:actorForm});
  assert.equal(actorResponse.status,201);
