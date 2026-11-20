@@ -84,7 +84,6 @@ app.post('/api/ai/recap-script',async(req,res,next)=>{
   if(req.body?.consent!==true)return res.status(400).json({error:'Confirm the Google Gemini Free Tier data-use notice before sending this transcript.'});
   if(!modes.has(recapMode))return res.status(400).json({error:'Invalid recap mode.'});
   if(!geminiStatus().configured)return res.status(503).json({error:'AI recap is not configured. Add GEMINI_API_KEY to the private server environment.'});
-  if(err.message.startsWith('YouTube discovery is not configured'))return res.status(503).json({error:err.message});
   const result=await generateBurmeseRecap({transcript,mode:recapMode,title});
   res.status(201).json({item:result,note:'Draft generated from the transcript you provided. Review names and story details before using it.'});
  }catch(e){next(e)}
@@ -244,6 +243,7 @@ app.use((error:unknown,_req:Request,res:Response,_next:NextFunction)=>{
  if(err instanceof multer.MulterError)return res.status(err.code==='LIMIT_FILE_SIZE'?413:400).json({error:err.code==='LIMIT_FILE_SIZE'?`File exceeds ${uploadLimitMb} MB upload limit.`:err.message});
  if(err.message.startsWith('Unsupported video type')||err.message.startsWith('Unsupported actor audio')||err.message.startsWith('Unsupported dialogue audio'))return res.status(415).json({error:err.message});
  if(err.message.startsWith('AI recap is not configured'))return res.status(503).json({error:err.message});
+ if(err.message.startsWith('YouTube discovery is not configured'))return res.status(503).json({error:err.message});
  if(err.message.startsWith('Gemini request failed')||err.message.startsWith('Gemini transcription failed'))return res.status(502).json({error:err.message});
  if(err.message.startsWith('Myanmar TTS is not configured'))return res.status(503).json({error:err.message});
  if(err.message.startsWith('Azure Speech request failed'))return res.status(502).json({error:err.message});
