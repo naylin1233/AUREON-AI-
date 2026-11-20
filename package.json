@@ -12,7 +12,8 @@
     "typecheck": "tsc -b",
     "start": "tsx server/index.ts",
     "typecheck:server": "tsc --ignoreConfig --noEmit --target ES2022 --module NodeNext --moduleResolution NodeNext --esModuleInterop --skipLibCheck --strict --types node server/index.ts server/store.ts",
-    "test:api": "node tests/api-smoke.mjs"
+    "test:api": "node tests/api-smoke.mjs",
+    "test:subtitles": "node --import tsx tests/subtitles-smoke.mjs"
   },
   "dependencies": {
     "@vitejs/plugin-react": "latest",
