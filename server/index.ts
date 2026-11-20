@@ -13,7 +13,7 @@ import { geminiStatus, generateBurmeseRecap } from './ai/gemini.js';
 import { generatePlatformPack } from './ai/platformPack.js';
 import { enqueueTranscriptionJob, resumePendingTranscriptionJobs } from './ai/transcriptionWorker.js';
 import { enqueueRenderJob, resumePendingRenderJobs } from './renderWorker.js';
-import { discoverReferencesManually, startDailyYouTubeReferenceDiscovery, youtubeReferenceDiscoveryStatus } from './youtubeDiscovery.js';
+import { dailyTopicStatus, discoverReferencesManually, selectDailyTopic, startDailyTopicSelection, startDailyYouTubeReferenceDiscovery, youtubeReferenceDiscoveryStatus } from './youtubeDiscovery.js';
 
 const execFileAsync=promisify(execFile);
 const app=express();
@@ -130,6 +130,8 @@ app.post('/api/projects/:id/url-source',async(req,res,next)=>{
  }catch(e){next(e)}
 });
 app.get('/api/reference-discovery/status',(_req,res)=>res.json(youtubeReferenceDiscoveryStatus()));
+app.get('/api/daily-topic/status',(_req,res)=>res.json(dailyTopicStatus()));
+app.post('/api/daily-topic/select',async(_req,res,next)=>{try{const result=await selectDailyTopic();res.status(result.item?200:503).json({...result,status:dailyTopicStatus()});}catch(e){next(e)}});
 app.post('/api/projects/:id/references/discover',async(req,res,next)=>{
  try{
   const project=getProject(String(req.params.id));if(!project)return res.status(404).json({error:'Project not found.'});
@@ -251,5 +253,6 @@ await mkdir(uploadsDir,{recursive:true});
 await resumePendingMediaJobs();
 await resumePendingTranscriptionJobs();
 await resumePendingRenderJobs();
+startDailyTopicSelection();
 startDailyYouTubeReferenceDiscovery();
 app.listen(port,host,()=>console.log(`AUREON API listening on http://${host}:${port}`));
