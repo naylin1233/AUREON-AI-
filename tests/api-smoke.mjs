@@ -38,6 +38,10 @@ try{
  assert.equal(health.features.burmeseTts,false);
  assert.equal(health.features.aiScriptGeneration,false);
  assert.equal(health.features.audioTranscription,false);
+ const platformNoConsent=await fetch(base+'/api/ai/platform-pack',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({title:'Smoke',recapScript:'ဇာတ်လမ်းအကျဉ်း',date:'2026-11-21',consent:false})});
+ assert.equal(platformNoConsent.status,400);
+ const platformUnavailable=await fetch(base+'/api/ai/platform-pack',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({title:'Smoke',recapScript:'ဇာတ်လမ်းအကျဉ်း',date:'2026-11-21',consent:true})});
+ assert.equal(platformUnavailable.status,503);
  const aiStatus=await (await fetch(base+'/api/ai/status')).json();
  assert.equal(aiStatus.configured,false);
  const aiNoConsent=await fetch(base+'/api/ai/recap-script',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({transcript:'ဇာတ်လမ်းအကျဉ်း',recapMode:'Cinematic',consent:false})});
