@@ -14,7 +14,7 @@ import { generatePlatformPack } from './ai/platformPack.js';
 import { enqueueTranscriptionJob, resumePendingTranscriptionJobs } from './ai/transcriptionWorker.js';
 import { enqueueRenderJob, resumePendingRenderJobs } from './renderWorker.js';
 import { dailyTopicStatus, discoverReferencesManually, selectDailyTopic, startDailyTopicSelection, startDailyYouTubeReferenceDiscovery, youtubeReferenceDiscoveryStatus } from './youtubeDiscovery.js';
-import { authIsConfigured, validateAuthConfiguration, verifyAdminPassword, createSessionToken, setSessionCookie, clearSessionCookie, adminSessionIsValid, requireAdminSession } from './auth.js';
+import { authIsConfigured, validateAuthConfiguration, verifyAdminPassword, createSessionToken, setSessionCookie, clearSessionCookie, adminSessionIsValid, requestOriginIsAllowed, requireAdminSession } from './auth.js';
 
 const execFileAsync=promisify(execFile);
 const app=express();
@@ -41,7 +41,7 @@ app.get('/api/health',(_req,res)=>res.json({ok:true,service:'AUREON AI API',vers
 app.get('/api/auth/status',(req,res)=>res.setHeader('Cache-Control','no-store').json({configured:authIsConfigured(),authenticated:!authIsConfigured()||adminSessionIsValid(req)}));
 app.post('/api/auth/login',(req,res)=>{
  const origin=req.get('origin');
- if(origin){try{if(new URL(origin).host!==req.get('host'))return res.status(403).json({error:'Cross-origin login is not allowed.'});}catch{return res.status(403).json({error:'Invalid request origin.'});}}
+ if(origin&&!requestOriginIsAllowed(req))return res.status(403).json({error:'Cross-origin login is not allowed.'});
  if(!authIsConfigured())return res.status(409).json({error:'Login is not configured on this server.'});
  const key=req.ip||'unknown';const now=Date.now();const current=loginFailures.get(key);
  if(current&&current.resetAt>now&&current.count>=5)return res.status(429).json({error:'Too many login attempts. Try again in 15 minutes.'});
