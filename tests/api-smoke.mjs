@@ -102,6 +102,10 @@ try{
  assert.equal(transcribeNoConsent.status,400);
  const transcribeUnavailable=await fetch(base+`/api/jobs/${createdJob.id}/transcribe`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({consent:true})});
  assert.equal(transcribeUnavailable.status,503);
+ const recapNoConsent=await fetch(base+`/api/jobs/${createdJob.id}/recap-script`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({consent:false})});
+ assert.equal(recapNoConsent.status,400);
+ const recapNotReady=await fetch(base+`/api/jobs/${createdJob.id}/recap-script`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({consent:true})});
+ assert.equal(recapNotReady.status,409);
 
  await stop();
  await start();
