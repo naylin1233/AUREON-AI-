@@ -27,6 +27,7 @@ export function parseSubtitleFile(input:string,language:'myanmar'|'english'='mya
 }
 export function serializeSubtitles(cues:SubtitleCue[],language:'myanmar'|'english',format:'srt'|'vtt'='srt'):string{
  const filtered=cues.filter(c=>(language==='myanmar'?c.myanmar:c.english).trim());
+ for(const cue of filtered){if(timestampToMs(cue.end)<=timestampToMs(cue.start))throw new Error('Subtitle end time must be later than start time.');}
  const blocks=filtered.map((cue,index)=>{
   const start=msToTimestamp(timestampToMs(cue.start),format==='srt'?',':'.');
   const end=msToTimestamp(timestampToMs(cue.end),format==='srt'?',':'.');
