@@ -27,6 +27,7 @@ export const api={
  createJob:(id:string)=>request<{item:Job;note:string}>(`/api/projects/${id}/recap-jobs`,{method:'POST'}),
  job:(id:string)=>request<{item:Job}>(`/api/jobs/${id}`),
  transcribeJob:(id:string,consent:boolean)=>request<{item:Job;note:string}>(`/api/jobs/${id}/transcribe`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({consent})}),
+ generateJobRecapScript:(id:string,consent:boolean)=>request<{item:Job;note:string}>(`/api/jobs/${id}/recap-script`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({consent})}),
  jobs:()=>request<{items:Job[]}>('/api/jobs'),
  aiStatus:()=>request<{configured:boolean;model:string;provider:string}>('/api/ai/status'),
  generateRecapScript:(transcript:string,recapMode:string,title:string,consent:boolean)=>request<{item:RecapScript;note:string}>('/api/ai/recap-script',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({transcript,recapMode,title,consent})}),
