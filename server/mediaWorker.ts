@@ -37,7 +37,7 @@ async function processMediaJob(jobId:string){
   const outputDir=path.join(storageDirectory(),'processed',jobId);
   await mkdir(outputDir,{recursive:true});
   await updateJob(jobId,{stage:'extracting_audio_chunks',progress:15,durationSeconds:duration,note:'Extracting mono 16 kHz WAV audio in 10-minute resumable-sized chunks.'});
-  await run('ffmpeg',['-nostdin','-hide_banner','-loglevel','error','-i',input,'-map','0:a:0','-vn','-ac','1','-ar','16000','-c:a','pcm_s16le','-f','segment','-segment_time','600','-reset_timestamps','1','-segment_format','wav',path.join(outputDir,'chunk-%04d.wav')]);
+  await run('ffmpeg',['-y','-nostdin','-hide_banner','-loglevel','error','-i',input,'-map','0:a:0','-vn','-ac','1','-ar','16000','-c:a','pcm_s16le','-f','segment','-segment_time','600','-reset_timestamps','1','-segment_format','wav',path.join(outputDir,'chunk-%04d.wav')]);
   const chunks=(await readdir(outputDir)).filter(name=>/^chunk-\d+\.wav$/.test(name)).sort();
   if(chunks.length===0)throw new Error('FFmpeg completed but no audio chunks were produced.');
   await updateJob(jobId,{status:'media_ready',stage:'media_preparation_complete',progress:100,chunkCount:chunks.length,outputDir:path.relative(process.cwd(),outputDir),note:`Media preparation complete: ${chunks.length} audio chunk(s). AI story analysis, Burmese TTS and video rendering are separate stages and have not started.`});
