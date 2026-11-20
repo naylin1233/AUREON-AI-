@@ -15,5 +15,6 @@ export const api={
  upload:(id:string,file:File)=>{const body=new FormData();body.append('video',file);return request<{item:Source;note:string}>(`/api/projects/${id}/upload`,{method:'POST',body})},
  addUrl:(id:string,url:string)=>request<{item:Source;note:string}>(`/api/projects/${id}/url-source`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url})}),
  createJob:(id:string)=>request<{item:Job;note:string}>(`/api/projects/${id}/recap-jobs`,{method:'POST'}),
- job:(id:string)=>request<{item:Job}>(`/api/jobs/${id}`)
+ job:(id:string)=>request<{item:Job}>(`/api/jobs/${id}`),
+ jobs:()=>request<{items:Job[]}>('/api/jobs')
 };
