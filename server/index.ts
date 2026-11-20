@@ -6,7 +6,7 @@ import { promisify } from 'node:util';
 import { unlink } from 'node:fs/promises';
 import { mkdir } from 'node:fs/promises';
 import path from 'node:path';
-import { addJob, addProject, addSource, getJobs, getProjects, getProject, getSources, getJob, updateJob, getVoiceProfiles, getVoiceProfile, addVoiceProfile, initializeStore, storageDirectory } from './store.js';
+import { addJob, addProject, addSource, getJobs, getProjects, getProject, getSources, getJob, updateJob, getVoiceProfiles, getVoiceProfile, addVoiceProfile, getVoiceAssignments, assignVoiceToCharacter, initializeStore, storageDirectory } from './store.js';
 import { enqueueMediaJob, resumePendingMediaJobs } from './mediaWorker.js';
 import { azureTtsStatus, synthesizeBurmese, type BurmeseVoice } from './tts/azureSpeech.js';
 import { geminiStatus, generateBurmeseRecap } from './ai/gemini.js';
@@ -130,6 +130,24 @@ app.post('/api/projects/:id/recap-jobs',async(req,res,next)=>{
  const item=await addJob(project.id,source.id);void enqueueMediaJob(item.id);res.status(202).json({item,note:'Media preparation job queued. AI recap generation has not started.'});
  }catch(e){next(e)}
 });
+
+app.get('/api/projects/:id/voice-assignments',(req,res)=>{
+ const project=getProject(String(req.params.id));if(!project)return res.status(404).json({error:'Project not found.'});
+ const items=getVoiceAssignments(project.id).map(item=>{const voice=getVoiceProfile(item.voiceProfileId);return {...item,voice:voice?{id:voice.id,name:voice.name,fileName:voice.fileName,audioUrl:'/api/voices/'+voice.id+'/audio'}:null};});
+ res.json({items});
+});
+app.post('/api/projects/:id/voice-assignments',async(req,res,next)=>{
+ try{
+  const project=getProject(String(req.params.id));if(!project)return res.status(404).json({error:'Project not found.'});
+  const voiceProfileId=typeof req.body?.voiceProfileId==='string'?req.body.voiceProfileId:'';
+  const character=typeof req.body?.character==='string'?req.body.character.trim():'';
+  if(!character||character.length>60)return res.status(400).json({error:'Character name is required (maximum 60 characters).'});
+  const voice=getVoiceProfile(voiceProfileId);if(!voice)return res.status(404).json({error:'Actor voice profile not found.'});
+  const item=await assignVoiceToCharacter({projectId:project.id,voiceProfileId,character});
+  res.status(201).json({item:{...item,voice:{id:voice.id,name:voice.name,fileName:voice.fileName,audioUrl:'/api/voices/'+voice.id+'/audio'}},note:'Recorded voice sample assigned to this project character. This does not clone or synthesize speech.'});
+ }catch(e){next(e)}
+});
+
 app.get('/api/jobs',(_req,res)=>res.json({items:getJobs()}));
 app.get('/api/jobs/:id',(req,res)=>{const item=getJob(String(req.params.id));if(!item)return res.status(404).json({error:'Job not found.'});res.json({item});});
 app.post('/api/jobs/:id/transcribe',async(req,res,next)=>{
