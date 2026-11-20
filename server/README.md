@@ -13,6 +13,7 @@
 - Job status endpoint: `GET /api/jobs/:id`.
 - Optional bearer-token API protection via `AUREON_API_TOKEN`.
 - Azure Burmese TTS adapter for Nilar/Thiha standard voices; stays disabled until server-side key and region are configured. No English fallback.
+- Gemini Interactions API adapter for Burmese recap-script drafts from user-provided transcripts; default model `gemini-3.8-flash`, disabled until server-side `GEMINI_API_KEY` is configured.
 - Production frontend static serving from `dist/`.
 - Docker image installs FFmpeg and persists `/app/storage/data`.
 
@@ -38,7 +39,7 @@ For a public deployment, configure a strong `AUREON_API_TOKEN`, HTTPS and a trus
 Local data lives under `storage/data/` (ignored by Git). Uploaded files are under `uploads/`; extracted chunks are under `processed/<job-id>/`. Back up this directory. A two-hour source creates approximately twelve ten-minute WAV chunks. Chunk extraction is actual FFmpeg work; it is not AI transcription or recap generation.
 
 ## Not implemented yet
-No AI story analysis/script generation, Myanmar TTS or voice cloning, scene-aware video editing/rendering, subtitle alignment/export, distributed job queue, remote URL downloading, cloud object storage, managed database, social OAuth, scheduled/automatic publishing, or Android package. Jobs reach `media_ready` only after audio extraction; AI recap generation has not started.
+No automatic speech recognition/transcript extraction, long-video transcript orchestration, Myanmar TTS voice cloning, scene-aware video editing/rendering, subtitle alignment/export, distributed job queue, remote URL downloading, cloud object storage, managed database, social OAuth, scheduled/automatic publishing, or Android package. Jobs reach `media_ready` only after audio extraction; AI recap generation has not started.
 
 ## Safety and cost
 - Bind to localhost by default; do not expose the development server publicly.
@@ -49,3 +50,9 @@ No AI story analysis/script generation, Myanmar TTS or voice cloning, scene-awar
 ## Burmese TTS configuration
 
 Set `AZURE_SPEECH_KEY` and `AZURE_SPEECH_REGION` in the private server environment to enable the standard Burmese voices `my-MM-NilarNeural` and `my-MM-ThihaNeural`. The integration returns a clear 503 while credentials are absent and never falls back to English. Use the Azure Free (F0) tier only; do not upgrade to a paid tier without explicit approval. Live audio generation has not been verified until a valid resource is configured. Personal voice cloning is not included.
+
+## Gemini recap-script configuration
+
+Set `GEMINI_API_KEY` in the private server environment. Optional model override: `GEMINI_MODEL` (default `gemini-3.8-flash`). The API accepts a user-provided transcript up to 30,000 characters and returns a Burmese draft in the selected recap mode. Transcripts are sent to Google for processing and are not stored by this endpoint. Do not submit private or sensitive material without appropriate permission. Check current model access and free-tier quota first; no paid billing is enabled by this app.
+
+This is transcript-to-script generation only. It does not transcribe uploaded audio or automatically produce a complete recap video.
