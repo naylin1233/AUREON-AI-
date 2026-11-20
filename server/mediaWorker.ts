@@ -40,7 +40,13 @@ async function processMediaJob(jobId:string){
   await run('ffmpeg',['-y','-nostdin','-hide_banner','-loglevel','error','-i',input,'-map','0:a:0','-vn','-ac','1','-ar','16000','-c:a','pcm_s16le','-f','segment','-segment_time','600','-reset_timestamps','1','-segment_format','wav',path.join(outputDir,'chunk-%04d.wav')]);
   const chunks=(await readdir(outputDir)).filter(name=>/^chunk-\d+\.wav$/.test(name)).sort();
   if(chunks.length===0)throw new Error('FFmpeg completed but no audio chunks were produced.');
-  await updateJob(jobId,{status:'media_ready',stage:'media_preparation_complete',progress:100,chunkCount:chunks.length,outputDir:path.relative(process.cwd(),outputDir),note:`Media preparation complete: ${chunks.length} audio chunk(s). AI story analysis, Burmese TTS and video rendering are separate stages and have not started.`});
+  await updateJob(jobId,{stage:'extracting_sampled_frames',progress:65,note:'Extracting low-resolution reference frames every 30 seconds for later visual review.'});
+  const framesDir=path.join(outputDir,'frames');
+  await mkdir(framesDir,{recursive:true});
+  await run('ffmpeg',['-y','-nostdin','-hide_banner','-loglevel','error','-i',input,'-vf','fps=1/30,scale=480:-2','-q:v','4',path.join(framesDir,'frame-%05d.jpg')]);
+  const frames=(await readdir(framesDir)).filter(name=>/^frame-\\d+\\.jpg$/.test(name)).sort();
+  if(frames.length===0)throw new Error('FFmpeg completed but no sampled reference frames were produced.');
+  await updateJob(jobId,{status:'media_ready',stage:'media_preparation_complete',progress:100,chunkCount:chunks.length,frameCount:frames.length,outputDir:path.relative(process.cwd(),outputDir),note:`Media preparation complete: ${chunks.length} audio chunk(s) and ${frames.length} sampled reference frame(s). These are review assets, not AI scene analysis. Burmese TTS and final video rendering have not started.`});
  }catch(error){
   const message=error instanceof Error?error.message:'Unknown media processing error';
   await updateJob(jobId,{status:'failed',stage:'media_preparation_failed',progress:0,error:message,note:'Media preparation failed. Check FFmpeg installation and the uploaded file.'});
