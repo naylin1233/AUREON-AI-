@@ -47,6 +47,7 @@ app.post('/api/ai/recap-script',async(req,res,next)=>{
   const recapMode=typeof req.body?.recapMode==='string'?req.body.recapMode:'Cinematic';
   const title=typeof req.body?.title==='string'?req.body.title.trim().slice(0,120):undefined;
   if(!transcript||transcript.length>30000)return res.status(400).json({error:'Paste a transcript (maximum 30,000 characters).'});
+  if(req.body?.consent!==true)return res.status(400).json({error:'Confirm the Google Gemini Free Tier data-use notice before sending this transcript.'});
   if(!modes.has(recapMode))return res.status(400).json({error:'Invalid recap mode.'});
   if(!geminiStatus().configured)return res.status(503).json({error:'AI recap is not configured. Add GEMINI_API_KEY to the private server environment.'});
   const result=await generateBurmeseRecap({transcript,mode:recapMode,title});
