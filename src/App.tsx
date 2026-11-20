@@ -56,7 +56,7 @@ export default function App(){
    <div className="brand"><div className="brand-mark">A</div><div><b>AUREON <span>AI</span></b><small>PREMIUM GOLD EDITION</small></div><button className="close-menu" onClick={()=>setMobileOpen(false)} aria-label="Close menu"><X size={18}/></button></div>
    <div className="nav-label">MEDIA WORKSPACE</div>
    <nav>{nav.map(item=>{const I=item.icon;return <button key={item.id} className={section===item.id?'nav-item active':'nav-item'} onClick={()=>{setSection(item.id);setMobileOpen(false)}}><I size={18}/><span>{item.label}</span></button>})}</nav>
-   <div className="sidebar-bottom"><div className="plan"><Sparkles size={17}/><b>Gold Studio</b><p>ဖန်တီးမှုအားလုံးကို တစ်နေရာတည်းမှာ စီမံပါ။</p><small>BACKEND FOUNDATION · 0.2.0</small></div><div className="profile"><div className="avatar">A</div><div><b>Studio Owner</b><small>Local workspace</small></div></div></div>
+   <div className="sidebar-bottom"><div className="plan"><Sparkles size={17}/><b>Gold Studio</b><p>ဖန်တီးမှုအားလုံးကို တစ်နေရာတည်းမှာ စီမံပါ။</p><small>MEDIA ENGINE · 0.3.0</small></div><div className="profile"><div className="avatar">A</div><div><b>Studio Owner</b><small>Local workspace</small></div></div></div>
   </aside>
   {mobileOpen&&<button className="scrim" onClick={()=>setMobileOpen(false)} aria-label="Close navigation"/>}
   <main className="main">
@@ -72,7 +72,7 @@ export default function App(){
       {section==='automation'&&<><div className="platforms"><Platform icon={PlayCircle} name="YouTube"/><Platform icon={Users} name="Facebook"/><Platform icon={Video} name="TikTok"/></div><div className="form-grid"><label>Daily start time<input type="time" defaultValue="06:00"/></label><label>Timezone<select defaultValue="Asia/Bangkok"><option>Asia/Bangkok</option></select></label></div><Empty icon={ShieldCheck} title="OAuth ချိတ်ဆက်မှု မရှိသေးပါ" text="Platform ခွင့်ပြုချက်ရပြီး preview/review ပြီးမှသာ publish လုပ်နိုင်မည်ဖြစ်သည်။"/></>}
       {section==='settings'&&<><div className="setting-row"><span>Theme</span><b>Premium Gold Edition</b></div><div className="setting-row"><span>Language</span><b>မြန်မာ / English</b></div><div className="setting-row"><span>Default timezone</span><b>Asia/Bangkok</b></div><div className="setting-row"><span>Paid services</span><b className="good">Disabled by default</b></div><div className="setting-row"><span>Backend API</span><b className={apiOnline?'good':'warning-text'}>{apiOnline?'Connected':'Offline'}</b></div></>}
     </section>}
-    <footer>© 2026 AUREON AI <span>Premium Gold Edition</span><small>Stage 2 · Backend foundation</small></footer>
+    <footer>© 2026 AUREON AI <span>Premium Gold Edition</span><small>Stage 3 · Media preparation</small></footer>
    </div>
   </main>
   {notice&&<div className="toast"><CircleAlert size={17}/>{notice}<button onClick={()=>setNotice('')} aria-label="Dismiss">×</button></div>}
