@@ -8,6 +8,7 @@ export type SubtitleCue = {id:string;start:string;end:string;myanmar:string;engl
 export type SubtitleTrack = {projectId:string;cues:SubtitleCue[];updatedAt:string};
 export type RenderJob = {id:string;projectId:string;sourceId:string;status:'queued'|'rendering'|'completed'|'failed';progress:number;note:string;includeDialogue:boolean;includeMyanmar:boolean;includeEnglish:boolean;durationSeconds?:number;error?:string;createdAt:string;updatedAt:string;videoUrl?:string};
 export type RecapScript = {script:string;model:string;interactionId?:string;usage?:{total_tokens?:number;total_input_tokens?:number;total_output_tokens?:number}};
+export type PlatformPack = {youtube:{title:string;description:string;script:string;tags:string[]};facebook:{title:string;caption:string;script:string;tags:string[]};tiktok:{hook:string;caption:string;script:string;cta:string;tags:string[]}};
 export type Job = {id:string;projectId:string;sourceId?:string;kind:'recap';status:'queued'|'processing'|'media_ready'|'transcribing'|'transcribed'|'failed'|'awaiting_pipeline';stage:string;progress:number;note:string;error?:string;outputDir?:string;chunkCount?:number;durationSeconds?:number;transcript?:string;recapScript?:string;recapScriptModel?:string;recapScriptGeneratedAt?:string;transcriptChunks?:string[];transcribedChunkCount?:number;transcriptionTotalChunks?:number;createdAt:string;updatedAt:string};
 async function request<T>(url:string,init?:RequestInit):Promise<T>{
  const response=await fetch(url,init);
@@ -31,6 +32,7 @@ export const api={
  jobs:()=>request<{items:Job[]}>('/api/jobs'),
  aiStatus:()=>request<{configured:boolean;model:string;provider:string}>('/api/ai/status'),
  generateRecapScript:(transcript:string,recapMode:string,title:string,consent:boolean)=>request<{item:RecapScript;note:string}>('/api/ai/recap-script',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({transcript,recapMode,title,consent})}),
+ generatePlatformPack:(title:string,recapScript:string,date:string,consent:boolean)=>request<{item:PlatformPack;model:string;note:string}>('/api/ai/platform-pack',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({title,recapScript,date,consent})}),
  subtitles:(projectId:string)=>request<{item:SubtitleTrack}>(`/api/projects/${projectId}/subtitles`),
  saveSubtitles:(projectId:string,cues:SubtitleCue[])=>request<{item:SubtitleTrack;note:string}>(`/api/projects/${projectId}/subtitles`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({cues})}),
  renders:(projectId:string)=>request<{items:RenderJob[]}>(`/api/projects/${projectId}/renders`),
