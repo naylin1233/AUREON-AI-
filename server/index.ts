@@ -1,6 +1,9 @@
 import express, { type NextFunction, type Request, type Response } from 'express';
 import multer from 'multer';
 import { randomUUID } from 'node:crypto';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
+import { unlink } from 'node:fs/promises';
 import { mkdir } from 'node:fs/promises';
 import path from 'node:path';
 import { addJob, addProject, addSource, getJobs, getProjects, getProject, getSources, getJob, updateJob, getVoiceProfiles, getVoiceProfile, addVoiceProfile, initializeStore, storageDirectory } from './store.js';
@@ -9,6 +12,7 @@ import { azureTtsStatus, synthesizeBurmese, type BurmeseVoice } from './tts/azur
 import { geminiStatus, generateBurmeseRecap } from './ai/gemini.js';
 import { enqueueTranscriptionJob, resumePendingTranscriptionJobs } from './ai/transcriptionWorker.js';
 
+const execFileAsync=promisify(execFile);
 const app=express();
 const port=Number(process.env.PORT||8787);
 const host=process.env.HOST||'127.0.0.1';
@@ -49,10 +53,11 @@ app.post('/api/voices',voiceUpload.single('audio'),async(req,res,next)=>{
  try{
   const name=typeof req.body?.name==='string'?req.body.name.trim():'';
   const character=typeof req.body?.character==='string'?req.body.character.trim():'';
-  if(!name||name.length>60)return res.status(400).json({error:'Voice profile name is required (maximum 60 characters).'});
-  if(!character||character.length>60)return res.status(400).json({error:'Character or role name is required (maximum 60 characters).'});
-  if(req.body?.consent!=='true')return res.status(400).json({error:'Confirm that you own this recording or have the voice actor’s permission.'});
+  if(!name||name.length>60){if(req.file)await unlink(req.file.path).catch(()=>undefined);return res.status(400).json({error:'Voice profile name is required (maximum 60 characters).'})}
+  if(!character||character.length>60){if(req.file)await unlink(req.file.path).catch(()=>undefined);return res.status(400).json({error:'Character or role name is required (maximum 60 characters).'})}
+  if(req.body?.consent!=='true'){if(req.file)await unlink(req.file.path).catch(()=>undefined);return res.status(400).json({error:'Confirm that you own this recording or have the voice actor’s permission.'})}
   if(!req.file)return res.status(400).json({error:'Select an actor voice recording first.'});
+  try{const probe=await execFileAsync('ffprobe',['-v','error','-select_streams','a:0','-show_entries','stream=codec_type','-of','csv=p=0',req.file.path]);if(!probe.stdout.includes('audio'))throw new Error('No audio stream found.')}catch{await unlink(req.file.path).catch(()=>undefined);return res.status(415).json({error:'The uploaded file is not a valid playable audio recording.'})}
   const item=await addVoiceProfile({name,character,language:'my-MM',fileName:req.file.originalname.slice(0,180),path:path.relative(process.cwd(),req.file.path),mimeType:req.file.mimetype,size:req.file.size,consentConfirmed:true});
   res.status(201).json({item:{...item,path:undefined,audioUrl:`/api/voices/${item.id}/audio`},note:'Voice sample saved as a recorded actor reference. It is not a cloned or generated voice.'});
  }catch(e){next(e)}
