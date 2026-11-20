@@ -9,6 +9,8 @@ export type SubtitleCue = {id:string;start:string;end:string;myanmar:string;engl
 export type SubtitleTrack = {projectId:string;cues:SubtitleCue[];updatedAt:string};
 export type RenderJob = {id:string;projectId:string;sourceId:string;status:'queued'|'rendering'|'completed'|'failed';progress:number;note:string;includeDialogue:boolean;includeMyanmar:boolean;includeEnglish:boolean;durationSeconds?:number;error?:string;createdAt:string;updatedAt:string;videoUrl?:string};
 export type RecapScript = {script:string;model:string;interactionId?:string;usage?:{total_tokens?:number;total_input_tokens?:number;total_output_tokens?:number}};
+export type DailyTopic = {id:string;date:string;videoId:string;title:string;channelName:string;url:string;category:string;viewCount:number;publishedAt:string;selectedAt:string};
+export type DailyTopicStatus = {configured:boolean;schedule:string;latest:DailyTopic|null;history:DailyTopic[];message:string};
 export type PlatformPack = {youtube:{title:string;description:string;script:string;tags:string[]};facebook:{title:string;caption:string;script:string;tags:string[]};tiktok:{hook:string;caption:string;script:string;cta:string;tags:string[]}};
 export type Job = {id:string;projectId:string;sourceId?:string;kind:'recap';status:'queued'|'processing'|'media_ready'|'transcribing'|'transcribed'|'failed'|'awaiting_pipeline';stage:string;progress:number;note:string;error?:string;outputDir?:string;chunkCount?:number;durationSeconds?:number;transcript?:string;recapScript?:string;recapScriptModel?:string;recapScriptGeneratedAt?:string;transcriptChunks?:string[];transcribedChunkCount?:number;transcriptionTotalChunks?:number;createdAt:string;updatedAt:string};
 async function request<T>(url:string,init?:RequestInit):Promise<T>{
@@ -24,6 +26,8 @@ export const api={
  sources:(id:string)=>request<{items:Source[]}>(`/api/projects/${id}/sources`),
  references:(id:string)=>request<{items:ReferenceSource[]}>(`/api/projects/${id}/references`),
  referenceDiscoveryStatus:()=>request<{configured:boolean;provider:string;schedule:string;lastRunAt:string|null;lastRunSummary:string;queryCount:number}>('/api/reference-discovery/status'),
+ dailyTopicStatus:()=>request<DailyTopicStatus>('/api/daily-topic/status'),
+ selectDailyTopic:()=>request<{item:DailyTopic|null;note:string;status:DailyTopicStatus}>('/api/daily-topic/select',{method:'POST'}),
  discoverReferences:(id:string,queries?:string)=>request<{item:{found:number;saved:number;queries:string[];note:string};items:ReferenceSource[];status:{configured:boolean;provider:string;schedule:string;lastRunAt:string|null;lastRunSummary:string;queryCount:number}}>(`/api/projects/${id}/references/discover`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({queries})}),
  addReference:(id:string,input:{url:string;title:string;channelName:string;language:string;notes:string;authorizedForUse:boolean})=>request<{item:ReferenceSource;note:string}>(`/api/projects/${id}/references`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(input)}),
  upload:(id:string,file:File)=>{const body=new FormData();body.append('video',file);return request<{item:Source;note:string}>(`/api/projects/${id}/upload`,{method:'POST',body})},
