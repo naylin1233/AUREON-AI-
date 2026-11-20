@@ -1,10 +1,19 @@
-import { addReferenceSource, getProjects } from './store.js';
+import { addDailyTopic, addReferenceSource, getDailyTopics, getProjects } from './store.js';
 
 type SearchItem = {
   id?: { kind?: string; videoId?: string; channelId?: string };
   snippet?: { title?: string; channelTitle?: string; channelId?: string; publishedAt?: string };
 };
 type SearchResponse = { items?: SearchItem[]; error?: { message?: string } };
+type VideoDetail = {id:string;snippet?:{title?:string;channelTitle?:string;publishedAt?:string};statistics?:{viewCount?:string}};
+type VideoListResponse = {items?:VideoDetail[];error?:{message?:string}};
+const topicCategories = [
+  {category:'Anime',query:'popular anime recap'},
+  {category:'Foreign Movie',query:'foreign movie recap'},
+  {category:'3D Animation',query:'3D animated movie recap'},
+  {category:'Donghua',query:'Chinese donghua recap'}
+];
+let topicStatusMessage = 'Daily topic has not been selected yet.';
 
 const defaultQueries = ['popular anime recap', 'foreign movie recap', '3D animation movie recap', 'Chinese donghua recap'];
 let lastRunAt: string | null = null;
@@ -124,3 +133,42 @@ export function startDailyYouTubeReferenceDiscovery() {
   }, msUntilBangkok0615());
   scheduleNext();
 }
+
+function bangkokDate(){return new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Bangkok'}).format(new Date());}
+export function dailyTopicStatus(){const history=getDailyTopics();return {configured:Boolean(process.env.YOUTUBE_API_KEY),schedule:'06:00 Asia/Bangkok daily',latest:history[0]||null,history:history.slice(0,30),message:topicStatusMessage};}
+async function fetchTopicCandidates(){
+ const key=process.env.YOUTUBE_API_KEY;if(!key)throw new Error('YouTube discovery is not configured. Add YOUTUBE_API_KEY to the private server environment.');
+ const publishedAfter=new Date(Date.now()-30*24*60*60*1000).toISOString();
+ const candidates=new Map<string,{id:string;category:string}>();
+ for(const item of topicCategories){
+  const url=new URL('https://www.googleapis.com/youtube/v3/search');
+  url.search=new URLSearchParams({part:'snippet',type:'video',q:item.query,maxResults:'5',order:'viewCount',publishedAfter,safeSearch:'strict',relevanceLanguage:'en',regionCode:'US',key}).toString();
+  const response=await fetch(url,{headers:{accept:'application/json'},signal:AbortSignal.timeout(15000)});
+  const data=await response.json() as SearchResponse;
+  if(!response.ok)throw new Error(data.error?.message||'YouTube trend search failed.');
+  for(const result of data.items||[]){const id=result.id?.videoId;if(id&&!candidates.has(id))candidates.set(id,{id,category:item.category});}
+ }
+ if(!candidates.size)return [];
+ const url=new URL('https://www.googleapis.com/youtube/v3/videos');
+ url.search=new URLSearchParams({part:'snippet,statistics',id:[...candidates.keys()].join(','),maxResults:'50',key}).toString();
+ const response=await fetch(url,{headers:{accept:'application/json'},signal:AbortSignal.timeout(15000)});
+ const data=await response.json() as VideoListResponse;
+ if(!response.ok)throw new Error(data.error?.message||'YouTube video statistics request failed.');
+ return (data.items||[]).map(video=>({...video,category:candidates.get(video.id)?.category||'Animation'}));
+}
+export async function selectDailyTopic(){
+ const today=bangkokDate();const history=getDailyTopics();const existing=history.find(x=>x.date===today);if(existing)return {item:existing,note:'Today’s topic was already selected.'};
+ const recent=history.filter(x=>Date.now()-Date.parse(x.selectedAt)<=30*24*60*60*1000);
+ const usedIds=new Set(recent.map(x=>x.videoId));const usedTitles=new Set(recent.map(x=>x.title.trim().toLocaleLowerCase()));
+ const candidates=await fetchTopicCandidates();
+ const eligible=candidates.filter(x=>!usedIds.has(x.id)&&!usedTitles.has((x.snippet?.title||'').trim().toLocaleLowerCase()));
+ eligible.sort((a,b)=>Number(b.statistics?.viewCount||0)-Number(a.statistics?.viewCount||0));
+ const chosen=eligible[0];
+ if(!chosen){topicStatusMessage='No eligible non-repeating trend topic was returned by YouTube. No topic was invented.';return {item:null,note:topicStatusMessage};}
+ const item=await addDailyTopic({date:today,videoId:chosen.id,title:(chosen.snippet?.title||'Untitled YouTube video').slice(0,200),channelName:(chosen.snippet?.channelTitle||'Unknown channel').slice(0,120),url:'https://www.youtube.com/watch?v='+encodeURIComponent(chosen.id),category:(chosen as VideoDetail & {category:string}).category,viewCount:Number(chosen.statistics?.viewCount||0),publishedAt:chosen.snippet?.publishedAt||''});
+ topicStatusMessage='Selected from recent YouTube videos by observed view count; reference metadata only.';
+ return {item,note:topicStatusMessage};
+}
+let topicScheduled=false;
+function msUntilBangkok0600(){const now=new Date();const local=new Date(now.getTime()+7*60*60*1000);let target=Date.UTC(local.getUTCFullYear(),local.getUTCMonth(),local.getUTCDate(),6,0)-7*60*60*1000;if(target<=now.getTime())target+=86400000;return target-now.getTime();}
+export function startDailyTopicSelection(){if(topicScheduled)return;topicScheduled=true;const schedule=()=>setTimeout(async()=>{try{if(process.env.YOUTUBE_API_KEY){const result=await selectDailyTopic();console.log('[Daily recap topic]',result.note);}}catch(error){topicStatusMessage=error instanceof Error?error.message:'Daily topic selection failed.';console.error('[Daily recap topic]',topicStatusMessage);}finally{schedule();}},msUntilBangkok0600());schedule();}
