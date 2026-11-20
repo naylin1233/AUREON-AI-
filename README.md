@@ -32,6 +32,7 @@
 - Supports five recap modes and prompts the model not to invent unsupported plot details.
 - Requires server-side `GEMINI_API_KEY`.
 - The transcript is sent to Google for processing and is not stored by this endpoint.
+- The UI and API require explicit consent before sending. Google states that Free Tier content may be used to improve its products.
 - Automatic transcription from video audio is not implemented.
 
 ### Stage 6 — Bilingual subtitle editor
@@ -83,7 +84,7 @@ A job marked `media_ready` means only that audio chunks were extracted. A genera
 ## Provider configuration
 
 ### Gemini recap scripts
-Set `GEMINI_API_KEY` in the private server environment. Default model: `gemini-3.8-flash`. Check Google AI Studio for current access and free-tier quota before enabling. The app does not activate paid billing automatically.
+Set `GEMINI_API_KEY` in the private server environment. Fixed model: `gemini-3.8-flash` (no paid-model override). The app cannot inspect whether the Google account has billing enabled; keep it on the Free Tier. The consent checkbox explains that Free Tier content may be used to improve Google products. The app does not activate paid billing automatically.
 
 ### Burmese neural voice
 Set `AZURE_SPEECH_KEY` and `AZURE_SPEECH_REGION` in the private server environment. Use the free tier only unless a paid plan is separately approved. Live synthesis requires valid credentials and has not yet been verified.
