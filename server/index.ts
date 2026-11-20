@@ -10,6 +10,7 @@ import { addJob, addProject, addSource, getJobs, getProjects, getProject, getSou
 import { enqueueMediaJob, resumePendingMediaJobs } from './mediaWorker.js';
 import { azureTtsStatus, synthesizeBurmese, type BurmeseVoice } from './tts/azureSpeech.js';
 import { geminiStatus, generateBurmeseRecap } from './ai/gemini.js';
+import { generatePlatformPack } from './ai/platformPack.js';
 import { enqueueTranscriptionJob, resumePendingTranscriptionJobs } from './ai/transcriptionWorker.js';
 import { enqueueRenderJob, resumePendingRenderJobs } from './renderWorker.js';
 import { discoverReferencesManually, startDailyYouTubeReferenceDiscovery, youtubeReferenceDiscoveryStatus } from './youtubeDiscovery.js';
@@ -220,6 +221,18 @@ app.post('/api/jobs/:id/recap-script',async(req,res,next)=>{
   const result=await generateBurmeseRecap({transcript:job.transcript,mode:project.recapMode,title:project.title});
   const item=await updateJob(id,{recapScript:result.script,recapScriptModel:result.model,recapScriptGeneratedAt:new Date().toISOString(),note:'Burmese recap script draft generated and saved. Review all names and story details before use.'});
   res.status(201).json({item,note:'Burmese recap script draft generated and saved to this job. Review all names and story details before use.'});
+ }catch(e){next(e)}
+});
+app.post('/api/ai/platform-pack',async(req,res,next)=>{
+ try{
+  const title=typeof req.body?.title==='string'?req.body.title.trim().slice(0,120):'AUREON AI Recap';
+  const recapScript=typeof req.body?.recapScript==='string'?req.body.recapScript.trim():'';
+  const date=typeof req.body?.date==='string'?req.body.date.slice(0,10):new Date().toISOString().slice(0,10);
+  if(req.body?.consent!==true)return res.status(400).json({error:'Confirm that the recap draft may be sent to Google Gemini to create separate platform versions.'});
+  if(!recapScript||recapScript.length>60000)return res.status(400).json({error:'Provide a recap script (maximum 60,000 characters).'});
+  if(!geminiStatus().configured)return res.status(503).json({error:'AI recap is not configured. Add GEMINI_API_KEY to the private server environment.'});
+  const result=await generatePlatformPack({title,recapScript,date});
+  res.status(201).json({item:result.item,model:result.model,note:'Separate YouTube, Facebook and TikTok drafts generated. Review all claims and add the real YouTube link before publishing.'});
  }catch(e){next(e)}
 });
 app.use(express.static(path.resolve(process.cwd(),'dist')));
