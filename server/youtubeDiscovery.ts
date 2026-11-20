@@ -19,7 +19,7 @@ const topicCategories = [
 ];
 let topicStatusMessage = 'Daily topic has not been selected yet.';
 
-const defaultQueries = ['popular anime recap', 'foreign movie recap', '3D animation movie recap', 'Chinese donghua recap'];
+const defaultQueries = ['trending anime recap', 'trending Chinese donghua 3D animation', 'trending foreign movie trailer 2026', 'trending animated movie trailer 2026'];
 let lastRunAt: string | null = null;
 let lastRunSummary = 'Not run yet';
 let lastManualRunMs = 0;
