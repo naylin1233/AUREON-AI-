@@ -43,6 +43,13 @@
 - Browser-side edits are not persisted to the server.
 - Automatic translation and speech-to-text alignment are not implemented.
 
+### Stage 7 — Consent-gated audio transcription
+- Sends each prepared 10-minute WAV chunk to Gemini Files API and transcribes in the original spoken language.
+- Processes chunks sequentially and saves completed transcript chunks for restart/retry recovery.
+- Deletes each temporary Gemini Files API upload after transcription.
+- Requires explicit per-job consent; Google states that Free Tier content may be used to improve its products.
+- Audio transcription is not live-verified without a configured Gemini key and quota.
+
 ## Run locally
 
 Requirements: Node.js 20+ and FFmpeg/FFprobe on PATH.
