@@ -3,7 +3,6 @@ export type Source = {id:string;projectId:string;kind:'upload'|'url';name:string
 export type TtsVoice = 'Nilar'|'Thiha';
 export type ActorVoiceProfile = {id:string;name:string;character:string;language:'my-MM';fileName:string;mimeType:string;size:number;consentConfirmed:true;createdAt:string;audioUrl:string};
 export type VoiceAssignment = {id:string;projectId:string;voiceProfileId:string;character:string;createdAt:string;voice:{id:string;name:string;fileName:string;audioUrl:string}|null};
-export type DialogueClip = {id:string;projectId:string;character:string;voiceAssignmentId?:string;fileName:string;mimeType:string;size:number;durationSeconds:number;startMs:number;createdAt:string;audioUrl:string};
 export type RecapScript = {script:string;model:string;interactionId?:string;usage?:{total_tokens?:number;total_input_tokens?:number;total_output_tokens?:number}};
 export type Job = {id:string;projectId:string;sourceId?:string;kind:'recap';status:'queued'|'processing'|'media_ready'|'transcribing'|'transcribed'|'failed'|'awaiting_pipeline';stage:string;progress:number;note:string;error?:string;outputDir?:string;chunkCount?:number;durationSeconds?:number;transcript?:string;transcriptChunks?:string[];transcribedChunkCount?:number;transcriptionTotalChunks?:number;createdAt:string;updatedAt:string};
 async function request<T>(url:string,init?:RequestInit):Promise<T>{
@@ -27,8 +26,6 @@ export const api={
  generateRecapScript:(transcript:string,recapMode:string,title:string,consent:boolean)=>request<{item:RecapScript;note:string}>('/api/ai/recap-script',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({transcript,recapMode,title,consent})}),
  voices:()=>request<{items:ActorVoiceProfile[]}>('/api/voices'),
  voiceAssignments:(projectId:string)=>request<{items:VoiceAssignment[]}>('/api/projects/'+projectId+'/voice-assignments'),
- dialogueClips:(projectId:string)=>request<{items:DialogueClip[]}>(`/api/projects/${projectId}/dialogue-clips`),
- addDialogueClip:(projectId:string,character:string,startMs:number,file:File,voiceAssignmentId?:string)=>{const body=new FormData();body.append('character',character);body.append('startMs',String(startMs));if(voiceAssignmentId)body.append('voiceAssignmentId',voiceAssignmentId);body.append('audio',file);return request<{item:DialogueClip;note:string}>(`/api/projects/${projectId}/dialogue-clips`,{method:'POST',body})},
  assignVoice:(projectId:string,voiceProfileId:string,character:string)=>request<{item:VoiceAssignment;note:string}>('/api/projects/'+projectId+'/voice-assignments',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({voiceProfileId,character})}),
  addVoice:(name:string,character:string,file:File,consent:boolean)=>{const body=new FormData();body.append('name',name);body.append('character',character);body.append('consent',String(consent));body.append('audio',file);return request<{item:ActorVoiceProfile;note:string}>('/api/voices',{method:'POST',body})},
  ttsStatus:()=>request<{configured:boolean;language:string;voices:{label:TtsVoice;id:string}[]}>('/api/tts/status'),

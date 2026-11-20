@@ -72,7 +72,6 @@ docker run --rm -p 8787:8787 -v aureon-data:/app/storage/data aureon-ai
 
 ## Not implemented yet
 - Automatic speech recognition or transcript extraction from uploaded videos.
-- Dialogue clip timeline mixing into the final video render.
 - Automatic chunk summarization and long-video recap orchestration.
 - Automatic subtitle translation or timing alignment.
 - Scene selection, AI/3D scene generation and final recap video rendering.
@@ -101,4 +100,4 @@ Official references: [Gemini Interactions API](https://ai.google.dev/gemini-api/
 
 ## Actor Voice Library
 
-The Myanmar Voice Studio supports adding consented actor recordings as named character voice references. Supported uploads: MP3, WAV, M4A, OGG, WEBM, AAC and FLAC (maximum 30 MB each). Profiles are stored locally under `storage/data/voice-profiles/` with a character/role label and an in-app audio preview. The uploader must confirm ownership or permission from the voice owner. These are original recordings only: profiles can be assigned to named characters within a project, and the assigned recording can be previewed. The current system does not clone the actor's voice or synthesize new lines in that actor's voice. Project Dialogue Clips can store original/authorized audio recordings, associate them with a character/voice assignment, validate duration with FFprobe, set a millisecond timeline start and preview the recording. Clips are timeline metadata only and are not yet mixed into rendered video.
+The Myanmar Voice Studio supports adding consented actor recordings as named character voice references. Supported uploads: MP3, WAV, M4A, OGG, WEBM, AAC and FLAC (maximum 30 MB each). Profiles are stored locally under `storage/data/voice-profiles/` with a character/role label and an in-app audio preview. The uploader must confirm ownership or permission from the voice owner. These are original recordings only: profiles can be assigned to named characters within a project, and the assigned recording can be previewed. The current system does not clone the actor's voice, synthesize new lines in that actor's voice, or mix the recording into a rendered video dialogue timeline.

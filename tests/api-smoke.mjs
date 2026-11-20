@@ -108,13 +108,9 @@ try{
  assert.equal(voiceList.length,1);assert.equal(voiceList[0].name,'Smoke Actor');
  const persistedAudio=await fetch(base+voiceList[0].audioUrl);assert.equal(persistedAudio.status,200);
  const persistedAssignments=(await (await fetch(base+`/api/projects/${project.id}/voice-assignments`)).json()).items;assert.equal(persistedAssignments.length,1);assert.equal(persistedAssignments[0].voice.name,'Smoke Actor');
- const clipForm=new FormData();clipForm.append('character','Main Hero');clipForm.append('voiceAssignmentId',persistedAssignments[0].id);clipForm.append('startMs','12500');clipForm.append('audio',new Blob([await readFile(sampleVoice)],{type:'audio/wav'}),'hero-line.wav');const clipResponse=await fetch(base+`/api/projects/${project.id}/dialogue-clips`,{method:'POST',body:clipForm});assert.equal(clipResponse.status,201);const clip=(await clipResponse.json()).item;assert.equal(clip.character,'Main Hero');assert.equal(clip.startMs,12500);assert.ok(clip.durationSeconds>0);assert.equal((await fetch(base+clip.audioUrl)).status,200);
- const badClipForm=new FormData();badClipForm.append('character','Wrong Character');badClipForm.append('voiceAssignmentId',persistedAssignments[0].id);badClipForm.append('audio',new Blob([await readFile(sampleVoice)],{type:'audio/wav'}),'wrong.wav');const badClip=await fetch(base+`/api/projects/${project.id}/dialogue-clips`,{method:'POST',body:badClipForm});assert.equal(badClip.status,400);
- const clipList=(await (await fetch(base+`/api/projects/${project.id}/dialogue-clips`)).json()).items;assert.equal(clipList.length,1);assert.equal(clipList[0].startMs,12500);
- const persistedClips=(await (await fetch(base+`/api/projects/${project.id}/dialogue-clips`)).json()).items;assert.equal(persistedClips.length,1);assert.equal(persistedClips[0].character,'Main Hero');assert.equal((await fetch(base+persistedClips[0].audioUrl)).status,200);
  const persistedJob=(await (await fetch(base+`/api/jobs/${createdJob.id}`)).json()).item;
  assert.equal(persistedJob.status,'media_ready');
- console.log('AUREON API smoke test passed: project persistence, upload, FFmpeg probe, 10-minute audio chunk extraction, job recovery, safe TTS/AI-not-configured behavior transcription consent gate, actor voice upload, consent, audio preview and voice library persistence, character voice assignments, dialogue clip upload, FFprobe duration, timeline metadata, playback, invalid assignment rejection and dialogue clip persistence.');
+ console.log('AUREON API smoke test passed: project persistence, upload, FFmpeg probe, 10-minute audio chunk extraction, job recovery, safe TTS/AI-not-configured behavior transcription consent gate, actor voice upload, consent, audio preview and voice library persistence.');
 }finally{
  await stop();
  await rm(dataDir,{recursive:true,force:true});

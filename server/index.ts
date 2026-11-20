@@ -6,7 +6,7 @@ import { promisify } from 'node:util';
 import { unlink } from 'node:fs/promises';
 import { mkdir } from 'node:fs/promises';
 import path from 'node:path';
-import { addJob, addProject, addSource, getJobs, getProjects, getProject, getSources, getJob, updateJob, getVoiceProfiles, getVoiceProfile, addVoiceProfile, getVoiceAssignments, assignVoiceToCharacter, getDialogueClips, getDialogueClip, addDialogueClip, initializeStore, storageDirectory } from './store.js';
+import { addJob, addProject, addSource, getJobs, getProjects, getProject, getSources, getJob, updateJob, getVoiceProfiles, getVoiceProfile, addVoiceProfile, getVoiceAssignments, assignVoiceToCharacter, initializeStore, storageDirectory } from './store.js';
 import { enqueueMediaJob, resumePendingMediaJobs } from './mediaWorker.js';
 import { azureTtsStatus, synthesizeBurmese, type BurmeseVoice } from './tts/azureSpeech.js';
 import { geminiStatus, generateBurmeseRecap } from './ai/gemini.js';
@@ -19,7 +19,6 @@ const host=process.env.HOST||'127.0.0.1';
 const uploadLimitMb=Math.max(1,Number(process.env.AUREON_MAX_UPLOAD_MB||1024));
 const uploadsDir=path.join(storageDirectory(),'uploads');
 const voiceDir=path.join(storageDirectory(),'voice-profiles');
-const dialogueDir=path.join(storageDirectory(),'dialogue-clips');
 app.disable('x-powered-by');
 app.use((req,res,next)=>{
  const origin=req.headers.origin;
@@ -47,8 +46,6 @@ const upload=multer({storage,limits:{fileSize:uploadLimitMb*1024*1024,files:1},f
 }});
 const voiceStorage=multer.diskStorage({destination:async(_req,_file,cb)=>{try{await mkdir(voiceDir,{recursive:true});cb(null,voiceDir)}catch(e){cb(e as Error,voiceDir)}},filename:(_req,file,cb)=>{const ext=path.extname(file.originalname).slice(0,10).toLowerCase();cb(null,randomUUID()+ext)}});
 const voiceUpload=multer({storage:voiceStorage,limits:{fileSize:30*1024*1024,files:1},fileFilter:(_req,file,cb)=>{const allowed=new Set(['audio/mpeg','audio/mp3','audio/wav','audio/x-wav','audio/mp4','audio/x-m4a','audio/ogg','audio/webm','audio/aac','audio/flac']);if(!allowed.has(file.mimetype))return cb(new Error('Unsupported actor audio. Use MP3, WAV, M4A, OGG, WEBM, AAC or FLAC.'));cb(null,true)}});
-const dialogueStorage=multer.diskStorage({destination:async(_req,_file,cb)=>{try{await mkdir(dialogueDir,{recursive:true});cb(null,dialogueDir)}catch(e){cb(e as Error,dialogueDir)}},filename:(_req,file,cb)=>{const ext=path.extname(file.originalname).slice(0,10).toLowerCase();cb(null,randomUUID()+ext)}});
-const dialogueUpload=multer({storage:dialogueStorage,limits:{fileSize:30*1024*1024,files:1},fileFilter:(_req,file,cb)=>{const allowed=new Set(['audio/mpeg','audio/mp3','audio/wav','audio/x-wav','audio/mp4','audio/x-m4a','audio/ogg','audio/webm','audio/aac','audio/flac']);if(!allowed.has(file.mimetype))return cb(new Error('Unsupported dialogue audio. Use MP3, WAV, M4A, OGG, WEBM, AAC or FLAC.'));cb(null,true)}});
 const modes=new Set(['Cinematic','Dialogue Breakdown','Narrator Story','Full Deep Dive','Short Viral 60s']);
 app.get('/api/health',(_req,res)=>res.json({ok:true,service:'AUREON AI API',version:'0.7.0',features:{projects:true,localUpload:true,durableJsonStore:true,mediaPreparation:true,aiGeneration:geminiStatus().configured,aiScriptGeneration:geminiStatus().configured,audioTranscription:geminiStatus().configured,burmeseTts:azureTtsStatus().configured,videoRendering:false,oauthPublishing:false}}));
 app.get('/api/voices',(_req,res)=>res.json({items:getVoiceProfiles().map(({path:_path,...item})=>({...item,audioUrl:`/api/voices/${item.id}/audio`}))}));
@@ -151,10 +148,6 @@ app.post('/api/projects/:id/voice-assignments',async(req,res,next)=>{
  }catch(e){next(e)}
 });
 
-app.get('/api/projects/:id/dialogue-clips',(req,res)=>{const project=getProject(String(req.params.id));if(!project)return res.status(404).json({error:'Project not found.'});res.json({items:getDialogueClips(project.id).map(({path:_path,...item})=>({...item,audioUrl:`/api/dialogue-clips/${item.id}/audio`}))});});
-app.post('/api/projects/:id/dialogue-clips',dialogueUpload.single('audio'),async(req,res,next)=>{try{const project=getProject(String(req.params.id));if(!project){if(req.file)await unlink(req.file.path).catch(()=>undefined);return res.status(404).json({error:'Project not found.'});}const character=typeof req.body?.character==='string'?req.body.character.trim():'';const startMs=Number(req.body?.startMs??0);const voiceAssignmentId=typeof req.body?.voiceAssignmentId==='string'&&req.body.voiceAssignmentId?req.body.voiceAssignmentId:undefined;if(!character||character.length>60){if(req.file)await unlink(req.file.path).catch(()=>undefined);return res.status(400).json({error:'Character name is required (maximum 60 characters).'});}if(!Number.isSafeInteger(startMs)||startMs<0||startMs>24*60*60*1000){if(req.file)await unlink(req.file.path).catch(()=>undefined);return res.status(400).json({error:'Start time must be a non-negative millisecond value within 24 hours.'});}if(!req.file)return res.status(400).json({error:'Select a dialogue audio clip.'});if(voiceAssignmentId){const assignment=getVoiceAssignments(project.id).find(x=>x.id===voiceAssignmentId);if(!assignment||assignment.character.toLocaleLowerCase()!==character.toLocaleLowerCase()){await unlink(req.file.path).catch(()=>undefined);return res.status(400).json({error:'Selected voice assignment must belong to this project and character.'});}}let durationSeconds=0;try{const probe=await execFileAsync('ffprobe',['-v','error','-show_entries','format=duration','-of','default=noprint_wrappers=1:nokey=1',req.file.path]);durationSeconds=Number(probe.stdout.trim());if(!Number.isFinite(durationSeconds)||durationSeconds<=0)throw new Error('Invalid duration');}catch{await unlink(req.file.path).catch(()=>undefined);return res.status(415).json({error:'The uploaded file is not a valid playable audio clip.'});}const item=await addDialogueClip({projectId:project.id,character,voiceAssignmentId,fileName:req.file.originalname.slice(0,180),path:path.relative(process.cwd(),req.file.path),mimeType:req.file.mimetype,size:req.file.size,durationSeconds,startMs});res.status(201).json({item:{...item,path:undefined,audioUrl:`/api/dialogue-clips/${item.id}/audio`},note:'Dialogue audio clip stored with character and timeline metadata. It is not yet mixed into a rendered video.'});}catch(e){next(e)}});
-app.get('/api/dialogue-clips/:id/audio',(req,res)=>{const item=getDialogueClip(String(req.params.id));if(!item)return res.status(404).json({error:'Dialogue clip not found.'});res.type(item.mimeType).sendFile(path.resolve(process.cwd(),item.path),error=>{if(error&&!res.headersSent)res.status(404).json({error:'Dialogue clip file not found.'});});});
-
 app.get('/api/jobs',(_req,res)=>res.json({items:getJobs()}));
 app.get('/api/jobs/:id',(req,res)=>{const item=getJob(String(req.params.id));if(!item)return res.status(404).json({error:'Job not found.'});res.json({item});});
 app.post('/api/jobs/:id/transcribe',async(req,res,next)=>{
@@ -174,7 +167,7 @@ app.use(express.static(path.resolve(process.cwd(),'dist')));
 app.use((error:unknown,_req:Request,res:Response,_next:NextFunction)=>{
  const err=error as Error & {code?:string};
  if(err instanceof multer.MulterError)return res.status(err.code==='LIMIT_FILE_SIZE'?413:400).json({error:err.code==='LIMIT_FILE_SIZE'?`File exceeds ${uploadLimitMb} MB upload limit.`:err.message});
- if(err.message.startsWith('Unsupported video type')||err.message.startsWith('Unsupported actor audio')||err.message.startsWith('Unsupported dialogue audio'))return res.status(415).json({error:err.message});
+ if(err.message.startsWith('Unsupported video type')||err.message.startsWith('Unsupported actor audio'))return res.status(415).json({error:err.message});
  if(err.message.startsWith('AI recap is not configured'))return res.status(503).json({error:err.message});
  if(err.message.startsWith('Gemini request failed')||err.message.startsWith('Gemini transcription failed'))return res.status(502).json({error:err.message});
  if(err.message.startsWith('Myanmar TTS is not configured'))return res.status(503).json({error:err.message});
