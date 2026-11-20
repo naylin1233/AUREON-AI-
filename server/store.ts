@@ -3,7 +3,8 @@ import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
 export type Project = { id:string; title:string; recapMode:string; createdAt:string; sourceIds:string[] };
-export type Source = { id:string; projectId:string; kind:'upload'|'url'; name:string; path?:string; url?:string; mimeType?:string; size?:number; status:'stored'|'awaiting_review'; createdAt:string };\nexport type ReferenceSource = {id:string;projectId:string;kind:'channel'|'video';url:string;title:string;channelName:string;language:string;notes:string;rightsStatus:'reference_only'|'authorized_for_use';createdAt:string};
+export type Source = { id:string; projectId:string; kind:'upload'|'url'; name:string; path?:string; url?:string; mimeType?:string; size?:number; status:'stored'|'awaiting_review'; createdAt:string };
+export type ReferenceSource = {id:string;projectId:string;kind:'channel'|'video';url:string;title:string;channelName:string;language:string;notes:string;rightsStatus:'reference_only'|'authorized_for_use';createdAt:string};
 export type VoiceAssignment = {id:string;projectId:string;voiceProfileId:string;character:string;createdAt:string};
 export type DialogueClip = {id:string;projectId:string;character:string;voiceAssignmentId?:string;fileName:string;path:string;mimeType:string;size:number;durationSeconds:number;startMs:number;createdAt:string};
 export type StoredSubtitleCue = {id:string;start:string;end:string;myanmar:string;english:string};
@@ -76,4 +77,6 @@ export async function updateRenderJob(id:string,patch:Partial<Omit<RenderJob,'id
 
 export function getVoiceAssignments(projectId:string){return state.voiceAssignments.filter(x=>x.projectId===projectId).sort((a,b)=>a.character.localeCompare(b.character));}
 export async function assignVoiceToCharacter(input:{projectId:string;voiceProfileId:string;character:string}){const existing=state.voiceAssignments.find(x=>x.projectId===input.projectId&&x.character.toLocaleLowerCase()===input.character.toLocaleLowerCase());if(existing){existing.voiceProfileId=input.voiceProfileId;await persist();return existing;}const item:VoiceAssignment={...input,id:randomUUID(),createdAt:new Date().toISOString()};state.voiceAssignments.push(item);await persist();return item;}
-\nexport function getReferenceSources(projectId:string){return state.referenceSources.filter(x=>x.projectId===projectId).sort((a,b)=>b.createdAt.localeCompare(a.createdAt));}\nexport async function addReferenceSource(input:Omit<ReferenceSource,'id'|'createdAt'>){const existing=state.referenceSources.find(x=>x.projectId===input.projectId&&x.url===input.url);if(existing){Object.assign(existing,input);await persist();return existing;}const item:ReferenceSource={...input,id:randomUUID(),createdAt:new Date().toISOString()};state.referenceSources.push(item);await persist();return item;}\n
+
+export function getReferenceSources(projectId:string){return state.referenceSources.filter(x=>x.projectId===projectId).sort((a,b)=>b.createdAt.localeCompare(a.createdAt));}
+export async function addReferenceSource(input:Omit<ReferenceSource,'id'|'createdAt'>){const existing=state.referenceSources.find(x=>x.projectId===input.projectId&&x.url===input.url);if(existing){Object.assign(existing,input);await persist();return existing;}const item:ReferenceSource={...input,id:randomUUID(),createdAt:new Date().toISOString()};state.referenceSources.push(item);await persist();return item;}
