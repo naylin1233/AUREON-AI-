@@ -39,7 +39,7 @@ const upload=multer({storage,limits:{fileSize:uploadLimitMb*1024*1024,files:1},f
  cb(null,true);
 }});
 const modes=new Set(['Cinematic','Dialogue Breakdown','Narrator Story','Full Deep Dive','Short Viral 60s']);
-app.get('/api/health',(_req,res)=>res.json({ok:true,service:'AUREON AI API',version:'0.6.0',features:{projects:true,localUpload:true,durableJsonStore:true,mediaPreparation:true,aiGeneration:geminiStatus().configured,aiScriptGeneration:geminiStatus().configured,audioTranscription:geminiStatus().configured,burmeseTts:azureTtsStatus().configured,videoRendering:false,oauthPublishing:false}}));
+app.get('/api/health',(_req,res)=>res.json({ok:true,service:'AUREON AI API',version:'0.7.0',features:{projects:true,localUpload:true,durableJsonStore:true,mediaPreparation:true,aiGeneration:geminiStatus().configured,aiScriptGeneration:geminiStatus().configured,audioTranscription:geminiStatus().configured,burmeseTts:azureTtsStatus().configured,videoRendering:false,oauthPublishing:false}}));
 app.get('/api/tts/status',(_req,res)=>res.json(azureTtsStatus()));
 app.get('/api/ai/status',(_req,res)=>res.json(geminiStatus()));
 app.post('/api/ai/recap-script',async(req,res,next)=>{
