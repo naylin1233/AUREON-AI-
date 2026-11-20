@@ -62,7 +62,11 @@ try{
  }
  assert.equal(finalJob.status,'media_ready',finalJob.error||'Media worker did not complete.');
  assert.equal(finalJob.chunkCount,1);
+ assert.ok(finalJob.frameCount>=1);
  assert.ok(finalJob.outputDir);
+ const { readdir }=await import('node:fs/promises');
+ const frameFiles=await readdir(path.join(dataDir,finalJob.outputDir,'frames'));
+ assert.ok(frameFiles.some(name=>name.endsWith('.jpg')));
 
  await stop();
  await start();
