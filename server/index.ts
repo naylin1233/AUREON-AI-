@@ -6,7 +6,7 @@ import { promisify } from 'node:util';
 import { unlink } from 'node:fs/promises';
 import { mkdir } from 'node:fs/promises';
 import path from 'node:path';
-import { addJob, addProject, addSource, getJobs, getProjects, getProject, getSources, getJob, updateJob, getVoiceProfiles, getVoiceProfile, addVoiceProfile, getVoiceAssignments, assignVoiceToCharacter, getDialogueClips, getDialogueClip, addDialogueClip, getSubtitleTrack, saveSubtitleTrack, getRenderJobs, getRenderJob, addRenderJob, initializeStore, storageDirectory } from './store.js';
+import { addJob, addProject, addSource, getJobs, getProjects, getProject, getSources, getJob, updateJob, addReferenceSource, getReferenceSources, getVoiceProfiles, getVoiceProfile, addVoiceProfile, getVoiceAssignments, assignVoiceToCharacter, getDialogueClips, getDialogueClip, addDialogueClip, getSubtitleTrack, saveSubtitleTrack, getRenderJobs, getRenderJob, addRenderJob, initializeStore, storageDirectory } from './store.js';
 import { enqueueMediaJob, resumePendingMediaJobs } from './mediaWorker.js';
 import { azureTtsStatus, synthesizeBurmese, type BurmeseVoice } from './tts/azureSpeech.js';
 import { geminiStatus, generateBurmeseRecap } from './ai/gemini.js';
@@ -125,6 +125,24 @@ app.post('/api/projects/:id/url-source',async(req,res,next)=>{
  if(!['http:','https:'].includes(parsed.protocol)||parsed.username||parsed.password||!parsed.hostname||['localhost','127.0.0.1','::1'].includes(parsed.hostname.toLowerCase()))return res.status(400).json({error:'Only public http(s) URLs are accepted.'});
  const item=await addSource({projectId:project.id,kind:'url',name:parsed.hostname,url:parsed.toString(),status:'awaiting_review'});
  res.status(201).json({item,note:'URL saved for review only. This server does not download or process remote media yet.'});
+ }catch(e){next(e)}
+});
+app.get('/api/projects/:id/references',(req,res)=>{const project=getProject(String(req.params.id));if(!project)return res.status(404).json({error:'Project not found.'});res.json({items:getReferenceSources(project.id)});});
+app.post('/api/projects/:id/references',async(req,res,next)=>{
+ try{
+  const project=getProject(String(req.params.id));if(!project)return res.status(404).json({error:'Project not found.'});
+  const raw=typeof req.body?.url==='string'?req.body.url.trim():'';
+  let parsed:URL;try{parsed=new URL(raw)}catch{return res.status(400).json({error:'Enter a valid YouTube channel or video URL.'})}
+  if(!['http:','https:'].includes(parsed.protocol)||parsed.username||parsed.password||!['youtube.com','www.youtube.com','m.youtube.com','youtu.be','www.youtu.be'].includes(parsed.hostname.toLowerCase()))return res.status(400).json({error:'Only public YouTube channel or video URLs are accepted.'});
+  const kind=parsed.hostname.toLowerCase().includes('youtu.be')||parsed.pathname==='/watch'||parsed.pathname.startsWith('/shorts/')?'video':'channel';
+  if(kind==='video'&&!parsed.searchParams.get('v')&&!parsed.pathname.startsWith('/shorts/')&&!parsed.hostname.includes('youtu.be'))return res.status(400).json({error:'YouTube video URL is missing its video ID.'});
+  const title=typeof req.body?.title==='string'?req.body.title.trim().slice(0,160):'';
+  const channelName=typeof req.body?.channelName==='string'?req.body.channelName.trim().slice(0,100):'';
+  const language=typeof req.body?.language==='string'?req.body.language.trim().slice(0,40):'Unknown';
+  const notes=typeof req.body?.notes==='string'?req.body.notes.trim().slice(0,1200):'';
+  const authorized=req.body?.authorizedForUse===true;
+  const item=await addReferenceSource({projectId:project.id,kind,url:parsed.toString(),title,channelName,language,notes,rightsStatus:authorized?'authorized_for_use':'reference_only'});
+  res.status(201).json({item,note:authorized?'Reference saved. Only content covered by your actual permission/license may be imported or adapted.':'Reference URL saved only. No video, audio, transcript, captions or channel content was downloaded.'});
  }catch(e){next(e)}
 });
 app.post('/api/projects/:id/recap-jobs',async(req,res,next)=>{

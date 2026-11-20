@@ -1,5 +1,5 @@
 export type Project = {id:string;title:string;recapMode:string;createdAt:string;sourceIds:string[]};
-export type Source = {id:string;projectId:string;kind:'upload'|'url';name:string;path?:string;url?:string;mimeType?:string;size?:number;status:'stored'|'awaiting_review';createdAt:string};
+export type Source = {id:string;projectId:string;kind:'upload'|'url';name:string;path?:string;url?:string;mimeType?:string;size?:number;status:'stored'|'awaiting_review';createdAt:string};\nexport type ReferenceSource = {id:string;projectId:string;kind:'channel'|'video';url:string;title:string;channelName:string;language:string;notes:string;rightsStatus:'reference_only'|'authorized_for_use';createdAt:string};
 export type TtsVoice = 'Nilar'|'Thiha';
 export type ActorVoiceProfile = {id:string;name:string;character:string;language:'my-MM';fileName:string;mimeType:string;size:number;consentConfirmed:true;createdAt:string;audioUrl:string};
 export type VoiceAssignment = {id:string;projectId:string;voiceProfileId:string;character:string;createdAt:string;voice:{id:string;name:string;fileName:string;audioUrl:string}|null};
@@ -19,7 +19,7 @@ export const api={
  health:()=>request<{ok:boolean;service:string;features:Record<string,boolean>}>('/api/health'),
  projects:()=>request<{items:Project[]}>('/api/projects'),
  createProject:(title:string,recapMode:string)=>request<{item:Project}>('/api/projects',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({title,recapMode})}),
- sources:(id:string)=>request<{items:Source[]}>(`/api/projects/${id}/sources`),
+ sources:(id:string)=>request<{items:Source[]}>(`/api/projects/${id}/sources`),\n references:(id:string)=>request<{items:ReferenceSource[]}>(`/api/projects/${id}/references`),\n addReference:(id:string,input:{url:string;title:string;channelName:string;language:string;notes:string;authorizedForUse:boolean})=>request<{item:ReferenceSource;note:string}>(`/api/projects/${id}/references`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(input)}),
  upload:(id:string,file:File)=>{const body=new FormData();body.append('video',file);return request<{item:Source;note:string}>(`/api/projects/${id}/upload`,{method:'POST',body})},
  addUrl:(id:string,url:string)=>request<{item:Source;note:string}>(`/api/projects/${id}/url-source`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url})}),
  createJob:(id:string)=>request<{item:Job;note:string}>(`/api/projects/${id}/recap-jobs`,{method:'POST'}),

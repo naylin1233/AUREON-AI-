@@ -3,7 +3,7 @@ import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
 export type Project = { id:string; title:string; recapMode:string; createdAt:string; sourceIds:string[] };
-export type Source = { id:string; projectId:string; kind:'upload'|'url'; name:string; path?:string; url?:string; mimeType?:string; size?:number; status:'stored'|'awaiting_review'; createdAt:string };
+export type Source = { id:string; projectId:string; kind:'upload'|'url'; name:string; path?:string; url?:string; mimeType?:string; size?:number; status:'stored'|'awaiting_review'; createdAt:string };\nexport type ReferenceSource = {id:string;projectId:string;kind:'channel'|'video';url:string;title:string;channelName:string;language:string;notes:string;rightsStatus:'reference_only'|'authorized_for_use';createdAt:string};
 export type VoiceAssignment = {id:string;projectId:string;voiceProfileId:string;character:string;createdAt:string};
 export type DialogueClip = {id:string;projectId:string;character:string;voiceAssignmentId?:string;fileName:string;path:string;mimeType:string;size:number;durationSeconds:number;startMs:number;createdAt:string};
 export type StoredSubtitleCue = {id:string;start:string;end:string;myanmar:string;english:string};
@@ -12,8 +12,8 @@ export type RenderJob = {id:string;projectId:string;sourceId:string;status:'queu
 export type VoiceProfile = {id:string;name:string;character:string;language:'my-MM';fileName:string;path:string;mimeType:string;size:number;consentConfirmed:true;createdAt:string};
 export type JobStatus = 'queued'|'processing'|'media_ready'|'transcribing'|'transcribed'|'failed'|'awaiting_pipeline';
 export type Job = { id:string; projectId:string; sourceId?:string; kind:'recap'; status:JobStatus; stage:string; progress:number; note:string; error?:string; outputDir?:string; durationSeconds?:number; chunkCount?:number; transcript?:string; transcriptChunks?:string[]; transcriptionConsentAt?:string; transcribedChunkCount?:number; transcriptionTotalChunks?:number; createdAt:string; updatedAt:string };
-type State = { projects:Project[]; sources:Source[]; jobs:Job[]; voices:VoiceProfile[]; voiceAssignments:VoiceAssignment[]; dialogueClips:DialogueClip[]; subtitleTracks:SubtitleTrack[]; renderJobs:RenderJob[] };
-const empty = ():State => ({projects:[],sources:[],jobs:[],voices:[],voiceAssignments:[],dialogueClips:[],subtitleTracks:[],renderJobs:[]});
+type State = { projects:Project[]; sources:Source[]; referenceSources:ReferenceSource[]; jobs:Job[]; voices:VoiceProfile[]; voiceAssignments:VoiceAssignment[]; dialogueClips:DialogueClip[]; subtitleTracks:SubtitleTrack[]; renderJobs:RenderJob[] };
+const empty = ():State => ({projects:[],sources:[],referenceSources:[],jobs:[],voices:[],voiceAssignments:[],dialogueClips:[],subtitleTracks:[],renderJobs:[]});
 const dataDir = path.resolve(process.env.AUREON_DATA_DIR || './storage/data');
 const statePath = path.join(dataDir,'state.json');
 let state:State = empty();
@@ -21,7 +21,7 @@ let writeChain = Promise.resolve();
 
 export async function initializeStore(){
  await mkdir(dataDir,{recursive:true});
- try { const parsed=JSON.parse(await readFile(statePath,'utf8')) as Partial<State>; state={projects:Array.isArray(parsed.projects)?parsed.projects:[],sources:Array.isArray(parsed.sources)?parsed.sources:[],jobs:Array.isArray(parsed.jobs)?parsed.jobs:[],voices:Array.isArray(parsed.voices)?parsed.voices:[],voiceAssignments:Array.isArray(parsed.voiceAssignments)?parsed.voiceAssignments:[],dialogueClips:Array.isArray(parsed.dialogueClips)?parsed.dialogueClips:[],subtitleTracks:Array.isArray(parsed.subtitleTracks)?parsed.subtitleTracks:[],renderJobs:Array.isArray(parsed.renderJobs)?parsed.renderJobs:[]}; }
+ try { const parsed=JSON.parse(await readFile(statePath,'utf8')) as Partial<State>; state={projects:Array.isArray(parsed.projects)?parsed.projects:[],sources:Array.isArray(parsed.sources)?parsed.sources:[],referenceSources:Array.isArray(parsed.referenceSources)?parsed.referenceSources:[],jobs:Array.isArray(parsed.jobs)?parsed.jobs:[],voices:Array.isArray(parsed.voices)?parsed.voices:[],voiceAssignments:Array.isArray(parsed.voiceAssignments)?parsed.voiceAssignments:[],dialogueClips:Array.isArray(parsed.dialogueClips)?parsed.dialogueClips:[],subtitleTracks:Array.isArray(parsed.subtitleTracks)?parsed.subtitleTracks:[],renderJobs:Array.isArray(parsed.renderJobs)?parsed.renderJobs:[]}; }
  catch(error){ if((error as NodeJS.ErrnoException).code!=='ENOENT') throw error; await persist(); }
 }
 async function persist(){
@@ -76,3 +76,4 @@ export async function updateRenderJob(id:string,patch:Partial<Omit<RenderJob,'id
 
 export function getVoiceAssignments(projectId:string){return state.voiceAssignments.filter(x=>x.projectId===projectId).sort((a,b)=>a.character.localeCompare(b.character));}
 export async function assignVoiceToCharacter(input:{projectId:string;voiceProfileId:string;character:string}){const existing=state.voiceAssignments.find(x=>x.projectId===input.projectId&&x.character.toLocaleLowerCase()===input.character.toLocaleLowerCase());if(existing){existing.voiceProfileId=input.voiceProfileId;await persist();return existing;}const item:VoiceAssignment={...input,id:randomUUID(),createdAt:new Date().toISOString()};state.voiceAssignments.push(item);await persist();return item;}
+\nexport function getReferenceSources(projectId:string){return state.referenceSources.filter(x=>x.projectId===projectId).sort((a,b)=>b.createdAt.localeCompare(a.createdAt));}\nexport async function addReferenceSource(input:Omit<ReferenceSource,'id'|'createdAt'>){const existing=state.referenceSources.find(x=>x.projectId===input.projectId&&x.url===input.url);if(existing){Object.assign(existing,input);await persist();return existing;}const item:ReferenceSource={...input,id:randomUUID(),createdAt:new Date().toISOString()};state.referenceSources.push(item);await persist();return item;}\n

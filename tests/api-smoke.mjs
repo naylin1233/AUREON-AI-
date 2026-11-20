@@ -74,7 +74,11 @@ try{
  assert.equal(urlResponse.status,201);
  assert.equal((await urlResponse.json()).item.status,'awaiting_review');
 
- const form=new FormData();
+ const badReference=await fetch(base+`/api/projects/${project.id}/references`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url:'https://example.com/not-youtube'})});assert.equal(badReference.status,400);
+ const referenceResponse=await fetch(base+`/api/projects/${project.id}/references`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url:'https://www.youtube.com/@sample-recap',channelName:'Sample Recap',language:'English',notes:'Study pacing only',authorizedForUse:false})});assert.equal(referenceResponse.status,201);const reference=(await referenceResponse.json()).item;assert.equal(reference.kind,'channel');assert.equal(reference.rightsStatus,'reference_only');
+ const referenceVideo=await fetch(base+`/api/projects/${project.id}/references`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url:'https://www.youtube.com/watch?v=abcdefghijk',title:'Sample video',authorizedForUse:true})});assert.equal(referenceVideo.status,201);assert.equal((await referenceVideo.json()).item.kind,'video');
+ const references=(await (await fetch(base+`/api/projects/${project.id}/references`)).json()).items;assert.equal(references.length,2);
+\n const form=new FormData();
  form.append('video',new Blob([await readFile(sampleVideo)],{type:'video/mp4'}),'sample.mp4');
  const uploadResponse=await fetch(base+`/api/projects/${project.id}/upload`,{method:'POST',body:form});
  assert.equal(uploadResponse.status,201);
@@ -117,7 +121,7 @@ try{
  const persistedClips=(await (await fetch(base+`/api/projects/${project.id}/dialogue-clips`)).json()).items;assert.equal(persistedClips.length,1);assert.equal(persistedClips[0].character,'Main Hero');assert.equal((await fetch(base+persistedClips[0].audioUrl)).status,200);const persistedSubtitle=(await (await fetch(base+`/api/projects/${project.id}/subtitles`)).json()).item;assert.equal(persistedSubtitle.cues[0].english,'English caption');
  const persistedJob=(await (await fetch(base+`/api/jobs/${createdJob.id}`)).json()).item;
  assert.equal(persistedJob.status,'media_ready');
- console.log('AUREON API smoke test passed: project persistence, upload, FFmpeg probe, 10-minute audio chunk extraction, job recovery, safe TTS/AI-not-configured behavior transcription consent gate, actor voice upload, consent, audio preview and voice library persistence, character voice assignments, dialogue clip upload, FFprobe duration, timeline metadata, playback, invalid assignment rejection, dialogue clip persistence, bilingual subtitle persistence and FFmpeg MP4 rendering with soft subtitle tracks and timed dialogue audio.');
+ console.log('AUREON API smoke test passed: project persistence, YouTube channel/video reference URL validation and metadata-only storage, upload, FFmpeg probe, 10-minute audio chunk extraction, job recovery, safe TTS/AI-not-configured behavior transcription consent gate, actor voice upload, consent, audio preview and voice library persistence, character voice assignments, dialogue clip upload, FFprobe duration, timeline metadata, playback, invalid assignment rejection, dialogue clip persistence, bilingual subtitle persistence and FFmpeg MP4 rendering with soft subtitle tracks and timed dialogue audio.');
 }finally{
  await stop();
  await rm(dataDir,{recursive:true,force:true});
