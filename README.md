@@ -2,16 +2,18 @@
 
 **Your World. Your AI.** — Premium Gold AI Media Studio.
 
-## Stage 1 — Web UI foundation
+## Current stage
 
-A responsive Burmese-first React + TypeScript + Vite dashboard for:
-- Donghua recap project setup with five recap modes;
-- authorized video upload / URL intake UI;
-- video library placeholder;
-- Myanmar + English subtitle studio placeholder;
-- Myanmar-only voice setup placeholder (no English fallback);
-- YouTube, Facebook and TikTok publishing setup UI;
-- Premium Gold theme and mobile navigation.
+### Stage 1 — Web UI
+Responsive Burmese-first React + TypeScript + Vite dashboard with recap modes, video library, subtitle, voice, and social publishing sections.
+
+### Stage 2 — Local backend foundation
+- Express API health check and Vite development proxy.
+- Project creation and JSON-backed persistence.
+- Local video upload with MIME allow-list and configurable size limit.
+- Authorized URL metadata registration (does not download remote files).
+- Recap job records persisted as `awaiting_pipeline` until a real worker exists.
+- Optional bearer-token API protection.
 
 ## Run locally
 
@@ -19,18 +21,20 @@ Requirements: Node.js 20+
 
 ```bash
 npm install
+cp .env.example .env
 npm run dev
-npm run build
 ```
 
-## Honest implementation status
+Open http://127.0.0.1:5173. API health is at http://127.0.0.1:8787/api/health.
 
-This branch is the **Stage 1 frontend foundation**, not a completed AI media production system. AI script generation, real Myanmar TTS, long-video chunk processing, scene-aware rendering, subtitle synchronization, persistent cloud storage, OAuth, scheduled publishing, and Android packaging are not implemented or verified yet. The UI must not be treated as if those integrations are active.
+## Important capability boundary
 
-## Project constraints
+The project is **not yet a complete AI video production system**. AI story analysis/script generation, real Myanmar TTS, personal voice support, scene extraction, 1–2 hour resumable video processing, rendering, subtitle synchronization/export, durable worker queue, cloud storage, OAuth, automatic publishing, and Android packaging are not yet implemented or verified. Jobs created by this version remain `awaiting_pipeline`; the UI must not imply that generation has started.
 
-- Prefer free tiers; do not enable paid billing without explicit approval.
-- Process only media the user owns, licenses, or is otherwise authorized to use.
-- Keep API keys and OAuth secrets server-side; never commit secrets.
-- Do not claim TTS/render/publishing success until end-to-end tests pass.
-- Android packaging follows a verified web/backend foundation.
+## Principles
+
+- Free-tier-first. No paid billing without explicit approval.
+- Only process videos the user owns or is authorized to use.
+- Keep provider keys and OAuth secrets on the server; never commit them.
+- Bind local development server to localhost. Do not deploy publicly without production authentication, HTTPS, rate limiting, persistent database and object storage.
+- Verify each integration end-to-end before showing it as active.
