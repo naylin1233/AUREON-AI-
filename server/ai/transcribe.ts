@@ -46,7 +46,7 @@ export async function transcribeAudioChunk(filePath:string,chunkIndex:number){
  const file=uploadData.file||uploadData;
  const fileName=typeof file.name==='string'?file.name:'';
  const fileUri=typeof file.uri==='string'?file.uri:'';
- if(!fileName||!fileUri)throw new Error('Gemini audio upload returned incomplete file metadata.');
+ if(!/^files\/[a-z0-9-]{1,40}$/.test(fileName)||!fileUri.startsWith('https://'))throw new Error('Gemini audio upload returned invalid file metadata.');
  let fileState=typeof file.state==='string'?file.state:'';
  try{
   for(let attempt=0;fileState!=='ACTIVE'&&attempt<20;attempt++){
