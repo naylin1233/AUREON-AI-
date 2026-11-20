@@ -27,6 +27,8 @@
     "@types/multer": "latest",
     "@types/node": "latest",
     "tsx": "latest",
-    "typescript": "latest"
+    "typescript": "latest",
+    "@types/react": "latest",
+    "@types/react-dom": "latest"
   }
 }
