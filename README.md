@@ -24,7 +24,7 @@
 - Server-side Azure Speech adapter for standard Burmese Nilar and Thiha voices.
 - MP3 validation, local storage and audio preview.
 - No English fallback.
-- Requires server-side Azure credentials; live synthesis has not yet been verified. Personal voice cloning is not included.
+- Requires explicit consent before sending narration text to Azure Speech.- Requires server-side Azure credentials and per-request consent; live synthesis has not yet been verified. Personal voice cloning is not included.
 
 ### Stage 5 — Burmese recap script drafts
 - Server-side Gemini Interactions API adapter; default model `gemini-3.8-flash`.
