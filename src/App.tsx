@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { ComponentType } from 'react';
 import { Activity, AudioLines, Clapperboard, Clock3, FileVideo, Film, Globe2, LayoutDashboard, Menu, Settings, ShieldCheck, Subtitles, PlayCircle, Users, Video, Plus, ChevronRight, Sparkles, Languages, CloudUpload, X, CircleAlert, CircleCheck } from 'lucide-react';
-import { api, type Project, type Source } from './api';
+import { api, type Job, type Project, type Source } from './api';
 
 type Section = 'overview'|'recap'|'library'|'captions'|'voice'|'automation'|'settings';
 type IconType = ComponentType<{size?: number}>;
@@ -25,26 +25,29 @@ export default function App(){
  const [projects,setProjects]=useState<Project[]>([]);
  const [activeProjectId,setActiveProjectId]=useState('');
  const [sources,setSources]=useState<Source[]>([]);
+ const [lastJob,setLastJob]=useState<Job|null>(null);
  const [apiOnline,setApiOnline]=useState(false);
  const [busy,setBusy]=useState(false);
  const title=nav.find(x=>x.id===section)?.label??'Dashboard';
  const refreshProjects=async()=>{const result=await api.projects();setProjects(result.items);return result.items;};
  const refreshSources=async(id:string)=>{if(!id){setSources([]);return;}const result=await api.sources(id);setSources(result.items);};
  useEffect(()=>{let alive=true;(async()=>{try{await api.health();const result=await api.projects();if(!alive)return;setApiOnline(true);setProjects(result.items);if(result.items[0]){setActiveProjectId(result.items[0].id);const sourceResult=await api.sources(result.items[0].id);if(alive)setSources(sourceResult.items);}}catch{if(alive)setApiOnline(false);}})();return()=>{alive=false};},[]);
- const selectProject=async(id:string)=>{setActiveProjectId(id);try{await refreshSources(id)}catch(e){setNotice((e as Error).message)}};
+ const selectProject=async(id:string)=>{setActiveProjectId(id);setLastJob(null);try{await refreshSources(id)}catch(e){setNotice((e as Error).message)}};
+ const monitorJob=async(id:string)=>{for(let i=0;i<120;i++){await new Promise(resolve=>setTimeout(resolve,1000));try{const result=await api.job(id);setLastJob(result.item);if(['media_ready','failed'].includes(result.item.status))return;}catch{return;}}};
  const createProject=async()=>{setBusy(true);try{const result=await api.createProject(projectTitle,mode);setActiveProjectId(result.item.id);await refreshProjects();setSources([]);setNotice('Project ကို Local Storage ထဲ သိမ်းပြီးပါပြီ။');return result.item.id;}catch(e){setNotice((e as Error).message);return '';}finally{setBusy(false)}};
  const prepareRecap=async()=>{
   setBusy(true);try{
    let projectId=activeProjectId;
    if(!projectId){const created=await api.createProject(projectTitle,mode);projectId=created.item.id;setActiveProjectId(projectId);await refreshProjects();}
-   let saved=false;
-   if(file){await api.upload(projectId,file);saved=true;setFile(null);}
+   let saved=false;let uploaded=false;
+   if(file){await api.upload(projectId,file);saved=true;uploaded=true;setFile(null);}
    if(url.trim()){await api.addUrl(projectId,url.trim());saved=true;setUrl('');}
    if(!saved){setNotice('Video ဖိုင် သို့မဟုတ် Authorized URL တစ်ခု ထည့်ပါ။');return;}
    await refreshSources(projectId);
-   const job=await api.createJob(projectId);
-   setNotice('Source ကို သိမ်းပြီးပါပြီ။ Job မှတ်တမ်းတင်ထားပါတယ်။ AI Worker မချိတ်ရသေးလို့ Processing မစသေးပါ။');
-   console.info('AUREON job record',job.item.id);
+   if(!uploaded){setNotice('URL ကို review အတွက်သာ သိမ်းထားပါတယ်။ Media Processing အတွက် Video ကို upload လုပ်ပါ။');return;}
+   const job=await api.createJob(projectId);setLastJob(job.item);
+   setNotice('Media Preparation Job ကို စတင်လိုက်ပါပြီ။ အခြေအနေကို ဒီစာမျက်နှာမှာ ကြည့်နိုင်ပါတယ်.');
+   void monitorJob(job.item.id);
   }catch(e){setNotice((e as Error).message)}finally{setBusy(false)}
  };
  const totalAssets=projects.reduce((sum,p)=>sum+p.sourceIds.length,0);
@@ -62,7 +65,7 @@ export default function App(){
     <div className="welcome"><div><div className="eyebrow"><Sparkles size={14}/> YOUR WORLD. YOUR AI.</div><h1>{section==='overview'?'မင်္ဂလာပါ၊ AUREON Studio မှ ကြိုဆိုပါတယ်။':title}</h1><p>{section==='overview'?'သင့်ရဲ့ AI Media Production ကို တစ်နေရာတည်းမှာ စီမံခန့်ခွဲလိုက်ပါ။':'Media Production လုပ်ငန်းစဉ်များကို စီမံနိုင်ပါတယ်။'}</p></div><button className="gold-button" onClick={()=>setSection('recap')}><Plus size={17}/> New Recap Project</button></div>
     {section==='overview'?<Overview setSection={setSection} projectCount={projects.length} assetCount={totalAssets} apiOnline={apiOnline}/>:<section className="panel">
       <div className="panel-heading"><Sparkles size={18}/><b>{title}</b><span className={apiOnline?'pill':'pill warning'}>{apiOnline?'API CONNECTED':'API OFFLINE'}</span></div>
-      {section==='recap'&&<><p className="muted">သင်ပိုင်ဆိုင်သော သို့မဟုတ် အသုံးပြုခွင့်ရှိသော Video များကိုသာ ထည့်သွင်းပါ။ File များကို သင့်ရဲ့ Local Storage ထဲ သိမ်းဆည်းပါမယ်။</p><div className="form-grid"><label>Project Name<input value={projectTitle} onChange={e=>setProjectTitle(e.target.value)} maxLength={120}/></label><label>Recap Mode<select value={mode} onChange={e=>setMode(e.target.value)}>{['Cinematic','Dialogue Breakdown','Narrator Story','Full Deep Dive','Short Viral 60s'].map(x=><option key={x}>{x}</option>)}</select></label></div><div className="form-grid"><label>Existing Project<select value={activeProjectId} onChange={e=>selectProject(e.target.value)}><option value="">Create a new project</option>{projects.map(p=><option key={p.id} value={p.id}>{p.title}</option>)}</select></label><label>Authorized Video URL<input value={url} onChange={e=>setUrl(e.target.value)} placeholder="https://... (metadata only)"/></label></div><label className="upload"><CloudUpload size={28}/><b>{file?.name||'Video ဖိုင်ရွေးချယ်ရန်'}</b><small>MP4, MOV, MKV, WEBM, AVI · Max upload 1024 MB</small><input type="file" accept="video/mp4,video/quicktime,video/x-matroska,video/webm,video/x-msvideo,video/mpeg" onChange={e=>setFile(e.target.files?.[0]??null)}/></label><div className="button-row"><button className="gold-button" disabled={busy||!apiOnline} onClick={createProject}><Plus size={16}/> Create Project</button><button className="gold-button" disabled={busy||!apiOnline} onClick={prepareRecap}>{busy?'Saving...':'Save Source & Create Job'} <ChevronRight size={16}/></button></div><p className="muted">ဒီအဆင့်မှာ File သိမ်းဆည်းခြင်းနဲ့ Job မှတ်တမ်းတင်ခြင်းသာ လုပ်နိုင်ပါတယ်။ AI Recap Processing မစသေးပါ။</p></>}
+      {section==='recap'&&<><p className="muted">သင်ပိုင်ဆိုင်သော သို့မဟုတ် အသုံးပြုခွင့်ရှိသော Video များကိုသာ ထည့်သွင်းပါ။ File များကို သင့်ရဲ့ Local Storage ထဲ သိမ်းဆည်းပါမယ်။</p><div className="form-grid"><label>Project Name<input value={projectTitle} onChange={e=>setProjectTitle(e.target.value)} maxLength={120}/></label><label>Recap Mode<select value={mode} onChange={e=>setMode(e.target.value)}>{['Cinematic','Dialogue Breakdown','Narrator Story','Full Deep Dive','Short Viral 60s'].map(x=><option key={x}>{x}</option>)}</select></label></div><div className="form-grid"><label>Existing Project<select value={activeProjectId} onChange={e=>selectProject(e.target.value)}><option value="">Create a new project</option>{projects.map(p=><option key={p.id} value={p.id}>{p.title}</option>)}</select></label><label>Authorized Video URL<input value={url} onChange={e=>setUrl(e.target.value)} placeholder="https://... (metadata only)"/></label></div><label className="upload"><CloudUpload size={28}/><b>{file?.name||'Video ဖိုင်ရွေးချယ်ရန်'}</b><small>MP4, MOV, MKV, WEBM, AVI · Max upload 1024 MB</small><input type="file" accept="video/mp4,video/quicktime,video/x-matroska,video/webm,video/x-msvideo,video/mpeg" onChange={e=>setFile(e.target.files?.[0]??null)}/></label><div className="button-row"><button className="gold-button" disabled={busy||!apiOnline} onClick={createProject}><Plus size={16}/> Create Project</button><button className="gold-button" disabled={busy||!apiOnline} onClick={prepareRecap}>{busy?'Saving...':'Save Source & Create Job'} <ChevronRight size={16}/></button></div><p className="muted">Upload လုပ်ထားသော Video ကို FFmpeg ဖြင့် Audio Chunk များအဖြစ် ခွဲထုတ်ပါမယ်။ AI Script, Myanmar TTS နှင့် Final Video Rendering ကို သီးခြားတည်ဆောက်ရပါမယ်။</p>{lastJob&&<div className="job-card"><div className="job-top"><b>Media Preparation</b><span className={'job-state '+lastJob.status}>{lastJob.status.replaceAll('_',' ').toUpperCase()}</span></div><div className="job-progress"><div style={{width:lastJob.progress+'%'}}/></div><div className="job-meta"><span>{lastJob.stage}</span><b>{lastJob.progress}%</b></div><p>{lastJob.note}</p>{lastJob.error&&<p className="job-error">{lastJob.error}</p>}{lastJob.chunkCount&&<small>{lastJob.chunkCount} audio chunk(s) · {Math.round((lastJob.durationSeconds||0)/60)} minutes</small>}</div>}</>}
       {section==='library'&&<><div className="form-grid"><label>Project<select value={activeProjectId} onChange={e=>selectProject(e.target.value)}><option value="">Select project</option>{projects.map(p=><option key={p.id} value={p.id}>{p.title}</option>)}</select></label></div>{sources.length===0?<Empty icon={Film} title="Video Library အလွတ်ဖြစ်နေပါတယ်" text="Project တစ်ခုရွေးပြီး Video upload လုပ်ပါ။"/>:<div className="source-list">{sources.map(s=><div className="source-row" key={s.id}><FileVideo size={20}/><div><b>{s.name}</b><small>{s.kind.toUpperCase()} · {s.status}{s.size?' · '+(s.size/1024/1024).toFixed(1)+' MB':''}</small></div></div>)}</div>}</>}
       {section==='captions'&&<Empty icon={Languages} title="Subtitle Engine မချိတ်ဆက်ရသေးပါ" text="Myanmar + English subtitle generation, timing နှင့် SRT/VTT export ကို နောက်အဆင့်မှာ တည်ဆောက်ပါမယ်။"/>}
       {section==='voice'&&<><Empty icon={AudioLines} title="Myanmar Voice Engine မချိတ်ဆက်ရသေးပါ" text="မြန်မာအသံ အမှန်တကယ် ထုတ်ပေးနိုင်သော provider ကို စမ်းသပ်အတည်ပြုပြီးမှ ဖွင့်ပါမယ်။ English fallback မသုံးပါ။"/><p className="muted">TTS status: Not configured — no sample audio is fabricated.</p></>}
