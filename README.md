@@ -31,6 +31,13 @@
 - AI remains disabled until `GEMINI_API_KEY` is configured server-side.
 - This stage does not transcribe audio automatically; users must provide a transcript.
 
+### Stage 5 — Bilingual subtitle workspace
+- Import SRT and WebVTT files into separate Myanmar and English tracks.
+- Merge imported language tracks by matching timestamps.
+- Edit cue timings and both language texts manually.
+- Export each language as SRT or WebVTT.
+- Automatic transcription, machine translation and subtitle alignment are not implemented.
+
 ## Run locally
 
 Requirements: Node.js 20+ and FFmpeg/FFprobe on PATH.
