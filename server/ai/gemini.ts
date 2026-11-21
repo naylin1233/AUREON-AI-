@@ -1,11 +1,15 @@
-export const GEMINI_MODEL='gemini-3.8-flash';
+import { aiProvidersStatus, generateOpenRouterFreeText, isTransientAiStatus } from './providers.js';
+
 export function geminiStatus(){
- return {configured:Boolean(process.env.GEMINI_API_KEY),model:GEMINI_MODEL,provider:'Google Gemini Interactions API',freeTierOnly:true};
+ return aiProvidersStatus();
 }
+
+function geminiOutput(data:any){
+ return Array.isArray(data.steps)?data.steps.filter((step:any)=>step?.type==='model_output').flatMap((step:any)=>Array.isArray(step.content)?step.content:[]).filter((part:any)=>part?.type==='text'&&typeof part.text==='string').map((part:any)=>part.text).join('\n').trim():'';
+}
+
 export async function generateBurmeseRecap(input:{transcript:string;mode:string;title?:string}){
- const key=process.env.GEMINI_API_KEY;
- if(!key)throw new Error('AI recap is not configured. Add GEMINI_API_KEY to the private server environment.');
- const model=GEMINI_MODEL;
+ if(!input.transcript.trim()||input.transcript.length>100000)throw new Error('Provide a transcript (maximum 100,000 characters).');
  const prompt=[
   'You are the Burmese-language script editor for AUREON AI.',
   'Create an original Myanmar-language recap script based ONLY on the supplied transcript.',
@@ -21,18 +25,26 @@ export async function generateBurmeseRecap(input:{transcript:string;mode:string;
   'SOURCE TRANSCRIPT:',
   input.transcript
  ].join('\n');
+ const geminiKey=process.env.GEMINI_API_KEY;
+ if(!geminiKey){
+  if(!process.env.OPENROUTER_API_KEY)throw new Error('AI recap is not configured. Add GEMINI_API_KEY or OPENROUTER_API_KEY to the private server environment.');
+  return {script:await generateOpenRouterFreeText(prompt),model:'openrouter/free'};
+ }
  const response=await fetch('https://generativelanguage.googleapis.com/v1beta/interactions',{
   method:'POST',
-  headers:{'x-goog-api-key':key,'Content-Type':'application/json'},
-  body:JSON.stringify({model,input:prompt,store:false}),
+  headers:{'x-goog-api-key':geminiKey,'Content-Type':'application/json'},
+  body:JSON.stringify({model:'gemini-3.8-flash',input:prompt,store:false}),
   signal:AbortSignal.timeout(120000)
  });
  const data=await response.json().catch(()=>({}));
  if(!response.ok){
   const detail=typeof data?.error?.message==='string'?data.error.message:'HTTP '+response.status;
+  if(isTransientAiStatus(response.status)&&process.env.OPENROUTER_API_KEY){
+   return {script:await generateOpenRouterFreeText(prompt),model:'openrouter/free'};
+  }
   throw new Error('Gemini request failed ('+response.status+'): '+detail.slice(0,400));
  }
- const output=Array.isArray(data.steps)?data.steps.filter((step:any)=>step?.type==='model_output').flatMap((step:any)=>Array.isArray(step.content)?step.content:[]).filter((part:any)=>part?.type==='text'&&typeof part.text==='string').map((part:any)=>part.text).join('\n').trim():'';
+ const output=geminiOutput(data);
  if(!output)throw new Error('Gemini returned no recap script text.');
- return {script:output,model:typeof data.model==='string'?data.model:model,interactionId:typeof data.id==='string'?data.id:undefined,usage:data.usage||undefined};
+ return {script:output,model:typeof data.model==='string'?data.model:'gemini-3.8-flash',interactionId:typeof data.id==='string'?data.id:undefined,usage:data.usage||undefined};
 }
