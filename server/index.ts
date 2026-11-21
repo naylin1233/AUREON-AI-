@@ -30,8 +30,7 @@ const loginFailures=new Map<string,{count:number;resetAt:number}>();
 app.disable('x-powered-by');
 app.use((req,res,next)=>{
  const origin=req.headers.origin;
- const isCloudflarePagesOrigin=Boolean(origin&&(/^https:\/\/aureon-ai\.pages\.dev$/.test(origin)||/^https:\/\/[a-z0-9-]+\.aureon-ai\.pages\.dev$/.test(origin)));
- if(origin&&(origin==='http://127.0.0.1:5173'||origin==='http://localhost:5173'||isCloudflarePagesOrigin))res.setHeader('Access-Control-Allow-Origin',origin);
+ if(origin&&requestOriginIsAllowed(req))res.setHeader('Access-Control-Allow-Origin',origin);
  res.setHeader('Vary','Origin');res.setHeader('Access-Control-Allow-Headers','Content-Type');
  res.setHeader('Access-Control-Allow-Methods','GET, POST, PUT, OPTIONS');
  res.setHeader('Access-Control-Allow-Credentials','true');
