@@ -26,7 +26,9 @@ export async function requestWithRetry(url:string,init:RequestInit,retries=MAX_G
   // POST can duplicate a request that Gemini already processed.
   const response=await fetch(url,{...init,signal:AbortSignal.timeout(300000)});
   if(!RETRYABLE_GEMINI_STATUSES.has(response.status)||attempt===retries)return response;
-  await wait(retryDelayMs(response,attempt));
+  const delay=retryDelayMs(response,attempt);
+  await response.body?.cancel().catch(()=>undefined);
+  await wait(delay);
  }
  throw new Error('Gemini request failed after retries.');
 }
