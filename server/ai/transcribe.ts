@@ -148,7 +148,7 @@ export async function transcribeAudioChunk(filePath:string,chunkIndex:number){
   return await transcribeWithGemini(filePath,chunkIndex);
  }catch(error){
   const message=error instanceof Error?error.message:String(error);
-  const transient=/Gemini transcription failed \\((408|429|500|502|503|504)\\)/.test(message);
+  const transient=/Gemini transcription failed \((408|429|500|502|503|504)\)/.test(message);
   if(!groqEnabled||!transient)throw error;
   try{return await transcribeWithGroq(filePath,chunkIndex);}
   catch(fallbackError){
