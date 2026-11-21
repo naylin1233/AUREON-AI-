@@ -106,7 +106,7 @@ test('retrying after a no-speech failure sends the audio to Gemini again',async(
 });
 
 test('a provider error still fails the job and keeps completed chunks for retry',async()=>{
- mockGemini(['First chunk speech here',500]);
+ mockGemini(['First chunk speech here',500,500,500]);
  const id=await makeJob(2);
  await enqueueTranscriptionJob(id);
  const job=store.getJob(id)!;
