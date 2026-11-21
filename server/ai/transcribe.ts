@@ -8,6 +8,22 @@ async function errorMessage(response:Response){
  const data=await response.json().catch(()=>({}));
  return typeof data?.error?.message==='string'?data.error.message.slice(0,400):'HTTP '+response.status;
 }
+async function requestWithRetry(url:string,init:RequestInit,retries=2){
+ let lastError:unknown;
+ for(let attempt=0;attempt<=retries;attempt++){
+  try{
+   const response=await fetch(url,{...init,signal:AbortSignal.timeout(300000)});
+   if(![408,429,500,502,503,504].includes(response.status)||attempt===retries)return response;
+   lastError=new Error('Temporary Gemini HTTP '+response.status);
+  }catch(error){
+   lastError=error;
+   const name=error instanceof Error?error.name:'';
+   if(!['AbortError','TimeoutError','TypeError'].includes(name)||attempt===retries)throw error;
+  }
+  await wait(Math.min(10000,1500*(2**attempt)));
+ }
+ throw lastError instanceof Error?lastError:new Error('Gemini request failed after retries.');
+}
 export async function transcribeAudioChunk(filePath:string,chunkIndex:number){
  const key=process.env.GEMINI_API_KEY;
  if(!key)throw new Error('Gemini is not configured. Add GEMINI_API_KEY to the private server environment.');
@@ -40,7 +56,7 @@ export async function transcribeAudioChunk(filePath:string,chunkIndex:number){
    'Content-Type':'audio/wav'
   },
   body:bytes as unknown as BodyInit,
-  signal:AbortSignal.timeout(180000)
+  signal:AbortSignal.timeout(300000)
  });
  if(!uploaded.ok)throw new Error('Gemini audio upload failed: '+await errorMessage(uploaded));
  const uploadData=await uploaded.json().catch(()=>({}));
@@ -71,11 +87,10 @@ export async function transcribeAudioChunk(filePath:string,chunkIndex:number){
    'Return only the transcript text, with paragraph breaks where natural. Do not add commentary or explanations.',
    'This is audio chunk '+(chunkIndex+1)+'.'
   ].join('\n');
-  const interaction=await fetch(API+'/v1beta/interactions',{
+  const interaction=await requestWithRetry(API+'/v1beta/interactions',{
    method:'POST',
    headers:{'x-goog-api-key':key,'Content-Type':'application/json'},
-   body:JSON.stringify({model:GEMINI_MODEL,input:[{type:'text',text:prompt},{type:'audio',uri:fileUri,mime_type:'audio/wav'}],store:false}),
-   signal:AbortSignal.timeout(180000)
+   body:JSON.stringify({model:GEMINI_MODEL,input:[{type:'text',text:prompt},{type:'audio',uri:fileUri,mime_type:'audio/wav'}],store:false})
   });
   if(!interaction.ok)throw new Error('Gemini transcription failed: '+await errorMessage(interaction));
   const data=await interaction.json().catch(()=>({}));
