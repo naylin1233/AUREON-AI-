@@ -1,3 +1,5 @@
+export const GEMINI_MODEL='gemini-3.8-flash';
+
 import { aiProvidersStatus, generateOpenRouterFreeText, isTransientAiStatus } from './providers.js';
 
 export function geminiStatus(){
@@ -33,7 +35,7 @@ export async function generateBurmeseRecap(input:{transcript:string;mode:string;
  const response=await fetch('https://generativelanguage.googleapis.com/v1beta/interactions',{
   method:'POST',
   headers:{'x-goog-api-key':geminiKey,'Content-Type':'application/json'},
-  body:JSON.stringify({model:'gemini-3.8-flash',input:prompt,store:false}),
+  body:JSON.stringify({model:GEMINI_MODEL,input:prompt,store:false}),
   signal:AbortSignal.timeout(120000)
  });
  const data=await response.json().catch(()=>({}));
@@ -46,5 +48,5 @@ export async function generateBurmeseRecap(input:{transcript:string;mode:string;
  }
  const output=geminiOutput(data);
  if(!output)throw new Error('Gemini returned no recap script text.');
- return {script:output,model:typeof data.model==='string'?data.model:'gemini-3.8-flash',interactionId:typeof data.id==='string'?data.id:undefined,usage:data.usage||undefined};
+ return {script:output,model:typeof data.model==='string'?data.model:GEMINI_MODEL,interactionId:typeof data.id==='string'?data.id:undefined,usage:data.usage||undefined};
 }
