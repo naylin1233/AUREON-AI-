@@ -31,7 +31,7 @@ function mockGemini(outputs:(string|number)[]){
   if(url==='https://generativelanguage.googleapis.com/v1beta/files/test-audio'&&method==='DELETE')return new Response('{}',{status:200,headers:{'content-type':'application/json'}});
   if(url==='https://generativelanguage.googleapis.com/v1beta/interactions'){
    const next=outputs[state.interactions++];
-   if(typeof next==='number')return new Response(JSON.stringify({error:{message:'mock provider failure'}}),{status:next,headers:{'content-type':'application/json'}});
+   if(typeof next==='number')return new Response(JSON.stringify({error:{message:'mock provider failure'}}),{status:next,headers:{'content-type':'application/json','retry-after':'0'}});
    return new Response(JSON.stringify({steps:[{type:'model_output',content:[{type:'text',text:next??''}]}]}),{status:200,headers:{'content-type':'application/json'}});
   }
   throw new Error('Unexpected mocked Gemini request: '+method+' '+url);
