@@ -68,13 +68,17 @@ function readCookie(req: Request, name: string) {
 }
 
 export function setSessionCookie(res: Response, token: string) {
-  const secure = process.env.NODE_ENV === 'production' ? '; Secure' : '';
-  res.setHeader('Set-Cookie', `${sessionCookieName}=${encodeURIComponent(token)}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${sessionLifetimeSeconds}${secure}`);
+  const isProduction = process.env.NODE_ENV === 'production';
+  const secure = isProduction ? '; Secure' : '';
+  const sameSite = isProduction ? 'None' : 'Strict';
+  res.setHeader('Set-Cookie', `${sessionCookieName}=${encodeURIComponent(token)}; Path=/; HttpOnly; SameSite=${sameSite}; Max-Age=${sessionLifetimeSeconds}${secure}`);
 }
 
 export function clearSessionCookie(res: Response) {
-  const secure = process.env.NODE_ENV === 'production' ? '; Secure' : '';
-  res.setHeader('Set-Cookie', `${sessionCookieName}=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0${secure}`);
+  const isProduction = process.env.NODE_ENV === 'production';
+  const secure = isProduction ? '; Secure' : '';
+  const sameSite = isProduction ? 'None' : 'Strict';
+  res.setHeader('Set-Cookie', `${sessionCookieName}=; Path=/; HttpOnly; SameSite=${sameSite}; Max-Age=0${secure}`);
 }
 
 export function adminSessionIsValid(req: Request) {
@@ -91,7 +95,11 @@ export function requestOriginIsAllowed(req: Request) {
   if (!origin) return true;
   try {
     const parsed = new URL(origin);
+    const isAureonPagesOrigin = parsed.protocol === 'https:' &&
+      (parsed.hostname === 'aureon-ai.pages.dev' ||
+        /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.aureon-ai\.pages\.dev$/.test(parsed.hostname));
     return parsed.host === req.get('host') ||
+      isAureonPagesOrigin ||
       origin === 'http://127.0.0.1:5173' ||
       origin === 'http://localhost:5173';
   } catch {
