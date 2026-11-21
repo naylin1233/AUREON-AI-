@@ -78,3 +78,36 @@ test('does not retry permanent Gemini client errors',async()=>{
   globalThis.fetch=previousFetch;
  }
 });
+
+
+test('uses the explicitly enabled Groq Whisper fallback when Gemini is not configured',async()=>{
+ const dir=await mkdtemp(path.join(os.tmpdir(),'aureon-groq-test-'));
+ const filePath=path.join(dir,'chunk.wav');
+ await writeFile(filePath,Buffer.alloc(256,7));
+ const previousFetch=globalThis.fetch;
+ const previousGemini=process.env.GEMINI_API_KEY;
+ const previousGroq=process.env.GROQ_API_KEY;
+ const previousEnabled=process.env.GROQ_TRANSCRIPTION_ENABLED;
+ delete process.env.GEMINI_API_KEY;
+ process.env.GROQ_API_KEY='test-only-key';
+ process.env.GROQ_TRANSCRIPTION_ENABLED='true';
+ globalThis.fetch=(async(input:any,init:any={})=>{
+  const url=typeof input==='string'?input:input.url;
+  assert.equal(url,'https://api.groq.com/openai/v1/audio/transcriptions');
+  assert.equal(init.method,'POST');
+  assert.equal(new Headers(init.headers).get('authorization'),'Bearer test-only-key');
+  assert.ok(init.body instanceof FormData);
+  assert.equal(init.body.get('model'),'whisper-large-v3-turbo');
+  return new Response(JSON.stringify({text:'မြန်မာအသံစာသား စမ်းသပ်ချက်'}),{status:200,headers:{'content-type':'application/json'}});
+ }) as typeof fetch;
+ try{
+  const transcript=await transcribeAudioChunk(filePath,0);
+  assert.equal(transcript,'မြန်မာအသံစာသား စမ်းသပ်ချက်');
+ }finally{
+  globalThis.fetch=previousFetch;
+  if(previousGemini===undefined)delete process.env.GEMINI_API_KEY;else process.env.GEMINI_API_KEY=previousGemini;
+  if(previousGroq===undefined)delete process.env.GROQ_API_KEY;else process.env.GROQ_API_KEY=previousGroq;
+  if(previousEnabled===undefined)delete process.env.GROQ_TRANSCRIPTION_ENABLED;else process.env.GROQ_TRANSCRIPTION_ENABLED=previousEnabled;
+  await rm(dir,{recursive:true,force:true});
+ }
+});
