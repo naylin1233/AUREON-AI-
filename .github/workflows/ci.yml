@@ -6,7 +6,7 @@ concurrency:
 
 on:
   push:
-    branches: ["main"]
+    branches: ["main", "stage-3/release-candidate", "fix/gemini-transcription-backoff"]
   pull_request:
     branches: ["main"]
   workflow_dispatch:
