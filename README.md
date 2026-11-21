@@ -1,2 +1,154 @@
-# AUREON-AI-
-AUREON AI - Premium Gold AI Media Studio
+# AUREON AI
+
+**Your World. Your AI.** — Premium Gold, Burmese-first media studio.
+
+## Implemented
+
+### Stage 1 — Web workspace
+- Responsive React + TypeScript + Vite dashboard.
+- Burmese-first UI and five recap modes.
+
+### Stage 2 — Local API and storage
+- Express API with JSON-backed project, source and job records.
+- Local video upload with file-size and MIME checks.
+- Authorized URL metadata registration only; remote URLs are not downloaded.
+- Optional bearer-token protection.
+
+### Stage 3 — Media preparation
+- FFmpeg/FFprobe validates uploaded video duration and audio stream.
+- Extracts mono 16 kHz WAV audio into ten-minute chunks.
+- Validates completed chunks and reuses them after server restart.
+- Tracks job status, progress, output path and failures.
+
+### Stage 4 — Myanmar voice connector
+- Server-side Azure Speech adapter for standard Burmese Nilar and Thiha voices.
+- MP3 validation, local storage and audio preview.
+- No English fallback.
+- Requires explicit consent before sending narration text to Azure Speech.- Requires server-side Azure credentials and per-request consent; live synthesis has not yet been verified. Personal voice cloning is not included.
+
+### Stage 5 — Burmese recap script drafts
+- Server-side Gemini Interactions API adapter; default model `gemini-3.8-flash`.
+- Creates Burmese script drafts from transcripts manually supplied by the user.
+- Supports five recap modes and prompts the model not to invent unsupported plot details.
+- Requires server-side `GEMINI_API_KEY`.
+- The transcript is sent to Google for processing and is not stored by this endpoint.
+- The UI and API require explicit consent before sending. Google states that Free Tier content may be used to improve its products.
+- Automatic transcription from video audio is not implemented.
+
+### Stage 6 — Bilingual subtitle editor
+- Import SRT and WebVTT files.
+- Edit Myanmar and English tracks, cue text and timestamps.
+- Export separate Myanmar/English SRT or VTT files.
+- Validate cue timestamp order.
+- Myanmar and English subtitle cues are persisted per project in JSON storage.
+- SRT/VTT import and export remain available.
+- Automatic translation and speech-to-text alignment are not implemented.
+
+### Stage 7 — Consent-gated audio transcription
+- Sends each prepared 10-minute WAV chunk to Gemini Files API and transcribes in the original spoken language.
+- Processes chunks sequentially and saves completed transcript chunks for restart/retry recovery.
+- Deletes each temporary Gemini Files API upload after transcription.
+- Requires explicit per-job consent; Google states that Free Tier content may be used to improve its products.
+- Audio transcription is not live-verified without a configured Gemini key and quota.
+- False-positive protection: the prompt asks Gemini to return `[no speech]` for silence, music or noise. Output that is only markers (`[no speech]`, `[unclear]`, `[music]`), a short "no speech" sentence, or fewer than 6 letters/digits is treated as an empty chunk and not saved as transcript text. If every chunk is empty, the job is marked `failed` (stage `transcription_no_speech`) and recap script generation stays blocked; retrying sends the audio to Gemini again. This is a heuristic, not a guarantee, and Gemini safety settings are unchanged.
+
+## Run locally
+
+Requirements: Node.js 20+ and FFmpeg/FFprobe on PATH.
+
+```bash
+npm install
+cp .env.example .env
+npm run dev
+```
+
+Web UI: http://127.0.0.1:5173  
+API health: http://127.0.0.1:8787/api/health
+
+## Docker
+
+```bash
+docker build -t aureon-ai .
+docker run --rm -p 8787:8787 -v aureon-data:/app/storage/data aureon-ai
+```
+
+### Stage 8 — Project subtitles and FFmpeg MP4 export
+- Saves bilingual Myanmar/English subtitle cue tracks per project.
+- Validates cue timestamps and text before persistence.
+- Queues resumable FFmpeg render jobs from an uploaded source video.
+- Mixes original dialogue clips at their millisecond timeline offsets with the source audio.
+- Muxes Myanmar and English subtitles as selectable soft subtitle tracks in MP4 (not burned-in captions).
+- Exposes render status and MP4 download endpoints.
+- Re-encodes video to H.264 and audio to AAC for MP4 compatibility.
+
+## Foreign YouTube recap references
+
+- Save public YouTube channel or video URLs against a project, with language, title, channel name and private notes.
+- URL references are metadata only: the app does not download videos, audio, captions, transcripts or channel content.
+- Mark a source as authorized only when you actually own it or hold the necessary license/permission. A checkbox is a declaration, not a legal verification. Reference-only sources may inform high-level format research, but scripts and edits must be original and must not reproduce another creator's narration, wording or edit.
+
+### Stage 9 — Transcript-to-Burmese recap script
+- A completed transcription job can generate a Burmese recap script directly from its saved transcript.
+- Uses the recap mode and project title already selected for that project.
+- Requires a separate explicit consent action before sending the transcript to Google Gemini.
+- Saves the generated script, model name and generation timestamp on the job record for later review.
+- Script generation is available only after the job reaches the `transcribed` state.
+- This creates a reviewable script draft; it does not create narration audio or a finished recap video.
+
+### Stage 10 — Platform-specific recap editions
+- From one reviewed Burmese recap draft, generate three distinct editorial versions rather than reposting one identical video/script.
+- YouTube: full long-form recap script, title, description and tags.
+- Facebook: separately paced mid-length recap script, title, caption and tags.
+- TikTok: 30–60 second vertical teaser, unique hook/caption, and a CTA pointing viewers to the YouTube full recap.
+- TikTok CTA intentionally uses `[YOUTUBE FULL VIDEO LINK]`; replace it with the real published YouTube URL before posting.
+- Requires explicit consent before sending the recap draft to Gemini. Output is a draft for human review, not an automatic post.
+- Daily trend discovery is described in Stage 11. Social OAuth publishing remains unimplemented.
+
+### Stage 11 — Daily trending topic selection
+- At 06:00 Asia/Bangkok, the server searches recent (last 30 days) public YouTube videos across Anime, foreign movies, 3D animation and Chinese donghua.
+- Video search uses YouTube `order=viewCount`; the selected candidate is checked against the saved 30-day history to avoid repeating the same video ID or exact title.
+- Saves the selected topic metadata, category, channel, publication date and observed view count in the persistent JSON state.
+- References Studio displays the latest selection and allows a manual selection attempt.
+- Requires `YOUTUBE_API_KEY`; without it, the system reports that selection is unavailable and does not invent a topic.
+- This selects a popular reference topic only. It does not identify or download the underlying movie, analyze its plot, create a recap script, or publish a video automatically.
+
+## Not implemented yet
+- Automatic speech recognition or transcript extraction from uploaded videos.
+- Automatic dialogue script generation and lip-sync.
+- Automatic chunk summarization and long-video recap orchestration.
+- Automatic subtitle translation or speech-to-text timing alignment.
+- Burned-in subtitle styling/position control.
+- AI/3D scene generation and automatic scene selection.
+- YouTube/Facebook/TikTok OAuth, scheduling and auto-publishing.
+- Production cloud database/object storage and Android APK packaging.
+
+A job marked `media_ready` means only that audio chunks were extracted. A generated script is a draft based on the transcript provided, not a finished recap video.
+
+## Safety and cost
+- Free-tier-first. No paid billing or tier upgrades without explicit approval.
+- Provider keys stay in private server environment variables. Never paste keys into chat or commit them.
+- Provider accounts and setup should be handled with adult/guardian assistance where required.
+- Process only media you own or are authorized to use.
+- Review AI-generated names, events and scripts before publishing.
+- Development server binds to localhost. Public deployment requires production authentication, HTTPS, rate limits, persistent database and object storage.
+
+## Provider configuration
+
+### Gemini recap scripts
+Set `GEMINI_API_KEY` in the private server environment. Fixed model: `gemini-3.8-flash` (no paid-model override). The app cannot inspect whether the Google account has billing enabled; keep it on the Free Tier. The consent checkbox explains that Free Tier content may be used to improve Google products. The app does not activate paid billing automatically.
+
+### Burmese neural voice
+Set `AZURE_SPEECH_KEY` and `AZURE_SPEECH_REGION` in the private server environment. Use the free tier only unless a paid plan is separately approved. Live synthesis requires valid credentials and has not yet been verified.
+
+Official references: [Gemini Interactions API](https://ai.google.dev/gemini-api/docs/get-started) · [Azure Burmese voice list](https://learn.microsoft.com/en-us/azure/ai-services/speech-service/language-support)
+
+## Actor Voice Library
+
+The Myanmar Voice Studio supports adding consented actor recordings as named character voice references. Supported uploads: MP3, WAV, M4A, OGG, WEBM, AAC and FLAC (maximum 30 MB each). Profiles are stored locally under `storage/data/voice-profiles/` with a character/role label and an in-app audio preview. The uploader must confirm ownership or permission from the voice owner. These are original recordings only: profiles can be assigned to named characters within a project, and the assigned recording can be previewed. The current system does not clone the actor's voice or synthesize new lines in that actor's voice. Project Dialogue Clips can store original/authorized audio recordings, associate them with a character/voice assignment, validate duration with FFprobe, set a millisecond timeline start and preview the recording. During MP4 rendering, these clips are mixed with the source audio at their configured timeline offsets.
+
+
+## Automatic foreign YouTube recap discovery
+
+The Reference Library can discover public recap channels and videos using the official YouTube Data API v3. Set `YOUTUBE_API_KEY` in the private server environment after enabling YouTube Data API v3 in a Google Cloud project. Optional `YOUTUBE_REFERENCE_QUERIES` accepts up to four semicolon-separated search terms; defaults cover popular anime recap, foreign movie recap, 3D animation movie recap and Chinese donghua recap. Video searches are ordered by YouTube view count; channel searches are relevance-ranked. This discovers references across categories, not just donghua.
+
+The server runs reference discovery daily at **06:15 Asia/Bangkok** and saves metadata-only references to existing projects. A separate daily topic selector runs at **06:00 Asia/Bangkok** and stores one non-repeating trending video reference in topic history. The References page also has a manual search button. Each reference-discovery run makes up to eight `search.list` requests (four terms × channel/video). Daily topic selection makes up to four additional video searches plus one statistics lookup; YouTube's default quota allows 100 search requests per day. Keep the key private and restrict it to the YouTube Data API. Search results are marked **REFERENCE ONLY**. This feature does not download videos, audio, transcripts, or captions, and it does not verify reuse rights. Only import or adapt source material when you have permission or a suitable license. The feature does not enable paid billing.

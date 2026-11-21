@@ -1,0 +1,40 @@
+{
+  "name": "aureon-ai",
+  "private": true,
+  "version": "0.7.0",
+  "type": "module",
+  "scripts": {
+    "dev": "concurrently -k \"npm:dev:server\" \"npm:dev:client\"",
+    "dev:client": "vite --host 127.0.0.1",
+    "dev:server": "tsx watch server/index.ts",
+    "build": "tsc -b && npm run typecheck:server && vite build",
+    "preview": "vite preview --host 127.0.0.1",
+    "typecheck": "tsc -b",
+    "start": "tsx server/index.ts",
+    "typecheck:server": "tsc --ignoreConfig --noEmit --target ES2022 --module NodeNext --moduleResolution NodeNext --esModuleInterop --skipLibCheck --strict --types node server/index.ts server/store.ts",
+    "test:api": "node tests/api-smoke.mjs",
+    "test:auth": "node tests/auth-smoke.mjs",
+    "test:subtitles": "node --import tsx tests/subtitles-smoke.mjs",
+    "test:unit": "node --import tsx --test tests/subtitles.test.ts tests/transcribe.test.ts tests/transcript-normalization.test.ts tests/transcription-worker.test.ts",
+    "test": "npm run test:unit && npm run test:auth && npm run test:api"
+  },
+  "dependencies": {
+    "@vitejs/plugin-react": "latest",
+    "concurrently": "latest",
+    "express": "latest",
+    "lucide-react": "latest",
+    "multer": "latest",
+    "react": "latest",
+    "react-dom": "latest",
+    "vite": "latest"
+  },
+  "devDependencies": {
+    "@types/express": "latest",
+    "@types/multer": "latest",
+    "@types/node": "latest",
+    "tsx": "latest",
+    "typescript": "latest",
+    "@types/react": "latest",
+    "@types/react-dom": "latest"
+  }
+}

@@ -1,0 +1,38 @@
+name: AUREON AI CI
+
+concurrency:
+  group: aureon-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+  workflow_dispatch:
+
+jobs:
+  web-build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install FFmpeg
+        timeout-minutes: 8
+        run: |
+          sudo apt-get install -y --no-install-recommends ffmpeg
+          ffmpeg -version
+          ffprobe -version
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+      - name: Typecheck and build
+        run: |
+          npm run build
+          npm test
+          npm run test:subtitles
+      - name: Build Docker image
+        run: docker build --tag aureon-ai:ci .
