@@ -47,7 +47,7 @@ async function processMediaJob(jobId:string){
   if(!audio.includes('audio'))throw new Error('This video has no audio track to prepare for narration analysis.');
   const outputDir=path.join(storageDirectory(),'processed',jobId);
   await mkdir(outputDir,{recursive:true});
-  const chunkSeconds=600;
+  const chunkSeconds=180;
   const totalChunks=Math.ceil(duration/chunkSeconds);
   let completed=0;
   for(let index=0;index<totalChunks;index++){
