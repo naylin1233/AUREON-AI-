@@ -21,7 +21,7 @@ async function processTranscriptionJob(jobId:string){
   const chunks=(await readdir(outputDir)).filter(name=>/^chunk-\d+\.wav$/.test(name)).sort();
   if(!chunks.length)throw new Error('No prepared audio chunks were found for this job.');
   const transcripts=[...(job.transcriptChunks||[])];
-  await updateJob(jobId,{status:'transcribing',stage:'transcribing_audio',progress:0,error:undefined,transcriptionTotalChunks:chunks.length,transcribedChunkCount:processedCount(transcripts),note:'Sending audio chunks to Google Gemini for original-language transcription. This requires the consent recorded for this job.'});
+  await updateJob(jobId,{status:'transcribing',stage:'transcribing_audio',progress:0,error:undefined,transcriptionTotalChunks:chunks.length,transcribedChunkCount:processedCount(transcripts),note:'Sending audio chunks to the configured provider for original-language transcription. This requires the consent recorded for this job.'});
   for(let index=0;index<chunks.length;index++){
    if(isProcessed(transcripts[index]))continue;
    await updateJob(jobId,{status:'transcribing',stage:`transcribing_chunk_${index+1}_of_${chunks.length}`,progress:Math.floor((index/chunks.length)*100),transcriptionTotalChunks:chunks.length,transcribedChunkCount:processedCount(transcripts),note:`Transcribing audio chunk ${index+1} of ${chunks.length}.`});
@@ -42,7 +42,7 @@ async function processTranscriptionJob(jobId:string){
   await updateJob(jobId,{status:'transcribed',stage:'transcription_complete',progress:100,transcriptChunks:transcripts,transcript,transcribedChunkCount:chunks.length,transcriptionTotalChunks:chunks.length,note:`Transcription complete: ${chunks.length} audio chunk(s)${silent?`, ${silent} without detectable speech`:''}. Review the transcript before generating a recap script.`});
  }catch(error){
   const message=error instanceof Error?error.message:'Unknown transcription error';
-  await updateJob(jobId,{status:'failed',stage:'transcription_failed',error:message,note:'Audio transcription failed. Completed chunks are preserved; retry after checking Gemini access and quota.'});
+  await updateJob(jobId,{status:'failed',stage:'transcription_failed',error:message,note:'Audio transcription failed. Completed chunks are preserved; retry after checking the configured provider and its quota.'});
  }
 }
 export async function resumePendingTranscriptionJobs(){

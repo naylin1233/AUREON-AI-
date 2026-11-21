@@ -8,23 +8,31 @@ async function errorMessage(response:Response){
  const data=await response.json().catch(()=>({}));
  return typeof data?.error?.message==='string'?data.error.message.slice(0,400):'HTTP '+response.status;
 }
-async function requestWithRetry(url:string,init:RequestInit,retries=2){
- let lastError:unknown;
- for(let attempt=0;attempt<=retries;attempt++){
-  try{
-   const response=await fetch(url,{...init,signal:AbortSignal.timeout(300000)});
-   if(![408,429,500,502,503,504].includes(response.status)||attempt===retries)return response;
-   lastError=new Error('Temporary Gemini HTTP '+response.status);
-  }catch(error){
-   lastError=error;
-   const name=error instanceof Error?error.name:'';
-   if(!['AbortError','TimeoutError','TypeError'].includes(name)||attempt===retries)throw error;
-  }
-  await wait(Math.min(10000,1500*(2**attempt)));
+const RETRYABLE_GEMINI_STATUSES=new Set([408,429,500,502,503,504]);
+const MAX_GEMINI_RETRIES=5;
+function retryDelayMs(response:Response,attempt:number){
+ const retryAfter=response.headers.get('retry-after');
+ if(retryAfter){
+  const seconds=Number(retryAfter);
+  if(Number.isFinite(seconds)&&seconds>=0)return Math.min(30000,seconds*1000);
+  const date=Date.parse(retryAfter);
+  if(Number.isFinite(date))return Math.min(30000,Math.max(0,date-Date.now()));
  }
- throw lastError instanceof Error?lastError:new Error('Gemini request failed after retries.');
+ return Math.min(15000,1000*(2**attempt));
 }
-export async function transcribeAudioChunk(filePath:string,chunkIndex:number){
+export async function requestWithRetry(url:string,init:RequestInit,retries=MAX_GEMINI_RETRIES){
+ for(let attempt=0;attempt<=retries;attempt++){
+  // Retry only explicit transient HTTP responses. Retrying a network timeout on a
+  // POST can duplicate a request that Gemini already processed.
+  const response=await fetch(url,{...init,signal:AbortSignal.timeout(300000)});
+  if(!RETRYABLE_GEMINI_STATUSES.has(response.status)||attempt===retries)return response;
+  const delay=retryDelayMs(response,attempt);
+  await response.body?.cancel().catch(()=>undefined);
+  await wait(delay);
+ }
+ throw new Error('Gemini request failed after retries.');
+}
+async function transcribeWithGemini(filePath:string,chunkIndex:number){
  const key=process.env.GEMINI_API_KEY;
  if(!key)throw new Error('Gemini is not configured. Add GEMINI_API_KEY to the private server environment.');
  const bytes=await readFile(filePath);
@@ -92,7 +100,7 @@ export async function transcribeAudioChunk(filePath:string,chunkIndex:number){
    headers:{'x-goog-api-key':key,'Content-Type':'application/json'},
    body:JSON.stringify({model:GEMINI_MODEL,input:[{type:'text',text:prompt},{type:'audio',uri:fileUri,mime_type:'audio/wav'}],store:false})
   });
-  if(!interaction.ok)throw new Error('Gemini transcription failed: '+await errorMessage(interaction));
+  if(!interaction.ok)throw new Error('Gemini transcription failed ('+interaction.status+'): '+await errorMessage(interaction));
   const data=await interaction.json().catch(()=>({}));
   const output=Array.isArray(data.steps)?data.steps.filter((step:any)=>step?.type==='model_output').flatMap((step:any)=>Array.isArray(step.content)?step.content:[]).filter((part:any)=>part?.type==='text'&&typeof part.text==='string').map((part:any)=>part.text).join('\n').trim():typeof data.output_text==='string'?data.output_text.trim():'';
   if(!output)throw new Error('Gemini returned no usable transcript for audio chunk '+(chunkIndex+1)+'.');
@@ -100,5 +108,52 @@ export async function transcribeAudioChunk(filePath:string,chunkIndex:number){
   return normalizeTranscript(output);
  }finally{
   await fetch(API+'/v1beta/'+fileName,{method:'DELETE',headers:{'x-goog-api-key':key},signal:AbortSignal.timeout(15000)}).catch(()=>undefined);
+ }
+}
+
+
+async function transcribeWithGroq(filePath:string,chunkIndex:number){
+ const key=process.env.GROQ_API_KEY;
+ if(!key||process.env.GROQ_TRANSCRIPTION_ENABLED!=='true')throw new Error('Groq transcription is disabled. It requires GROQ_API_KEY and GROQ_TRANSCRIPTION_ENABLED=true.');
+ const bytes=await readFile(filePath);
+ if(bytes.length<100)throw new Error('Audio chunk is empty or too small to transcribe.');
+ if(bytes.length>25*1024*1024)throw new Error('Groq free-tier audio uploads are limited to 25 MB per request. Reduce the chunk size before enabling this provider.');
+ const form=new FormData();
+ form.append('file',new Blob([new Uint8Array(bytes)],{type:'audio/wav'}),`aureon-audio-chunk-${chunkIndex+1}.wav`);
+ form.append('model','whisper-large-v3-turbo');
+ form.append('response_format','json');
+ const response=await fetch('https://api.groq.com/openai/v1/audio/transcriptions',{
+  method:'POST',
+  headers:{Authorization:'Bearer '+key},
+  body:form,
+  signal:AbortSignal.timeout(300000)
+ });
+ const data=await response.json().catch(()=>({}));
+ if(!response.ok){
+  const detail=typeof data?.error?.message==='string'?data.error.message:'HTTP '+response.status;
+  throw new Error('Groq transcription failed ('+response.status+'): '+detail.slice(0,300));
+ }
+ const output=typeof data?.text==='string'?data.text.trim():'';
+ if(!output)throw new Error('Groq returned no usable transcript for audio chunk '+(chunkIndex+1)+'.');
+ return normalizeTranscript(output);
+}
+
+export async function transcribeAudioChunk(filePath:string,chunkIndex:number){
+ const groqEnabled=Boolean(process.env.GROQ_API_KEY)&&process.env.GROQ_TRANSCRIPTION_ENABLED==='true';
+ if(!process.env.GEMINI_API_KEY){
+  if(groqEnabled)return transcribeWithGroq(filePath,chunkIndex);
+  throw new Error('No audio transcription provider is configured. Add GEMINI_API_KEY, or explicitly enable the metered Groq fallback.');
+ }
+ try{
+  return await transcribeWithGemini(filePath,chunkIndex);
+ }catch(error){
+  const message=error instanceof Error?error.message:String(error);
+  const transient=/Gemini transcription failed \((408|429|500|502|503|504)\)/.test(message);
+  if(!groqEnabled||!transient)throw error;
+  try{return await transcribeWithGroq(filePath,chunkIndex);}
+  catch(fallbackError){
+   const fallbackMessage=fallbackError instanceof Error?fallbackError.message:String(fallbackError);
+   throw new Error(message+'; optional Groq fallback also failed: '+fallbackMessage);
+  }
  }
 }

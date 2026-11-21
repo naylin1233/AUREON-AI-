@@ -10,6 +10,7 @@ import { addJob, addProject, addSource, getJobs, getProjects, getProject, getSou
 import { enqueueMediaJob, resumePendingMediaJobs } from './mediaWorker.js';
 import { azureTtsStatus, synthesizeBurmese, type BurmeseVoice } from './tts/azureSpeech.js';
 import { geminiStatus, generateBurmeseRecap } from './ai/gemini.js';
+import { aiProvidersStatus } from './ai/providers.js';
 import { generatePlatformPack } from './ai/platformPack.js';
 import { enqueueTranscriptionJob, resumePendingTranscriptionJobs } from './ai/transcriptionWorker.js';
 import { recapScriptBlockReason } from './ai/transcriptText.js';
@@ -38,7 +39,7 @@ app.use((req,res,next)=>{
  next();
 });
 app.use(express.json({limit:'1mb'}));
-app.get('/api/health',(_req,res)=>res.json({ok:true,service:'AUREON AI API',version:'0.7.0',features:{projects:true,localUpload:true,durableJsonStore:true,mediaPreparation:true,aiGeneration:geminiStatus().configured,aiScriptGeneration:geminiStatus().configured,audioTranscription:geminiStatus().configured,burmeseTts:azureTtsStatus().configured,videoRendering:true,subtitlePersistence:true,oauthPublishing:false}}));
+app.get('/api/health',(_req,res)=>res.json({ok:true,service:'AUREON AI API',version:'0.7.0',features:{projects:true,localUpload:true,durableJsonStore:true,mediaPreparation:true,aiGeneration:geminiStatus().configured,aiScriptGeneration:geminiStatus().configured,audioTranscription:aiProvidersStatus().transcriptionConfigured,burmeseTts:azureTtsStatus().configured,videoRendering:true,subtitlePersistence:true,oauthPublishing:false}}));
 app.get('/api/auth/status',(req,res)=>res.setHeader('Cache-Control','no-store').json({configured:authIsConfigured(),authenticated:!authIsConfigured()||adminSessionIsValid(req)}));
 app.post('/api/auth/login',(req,res)=>{
  const origin=req.get('origin');
@@ -96,7 +97,7 @@ app.post('/api/ai/recap-script',async(req,res,next)=>{
   const recapMode=typeof req.body?.recapMode==='string'?req.body.recapMode:'Cinematic';
   const title=typeof req.body?.title==='string'?req.body.title.trim().slice(0,120):undefined;
   if(!transcript||transcript.length>100000)return res.status(400).json({error:'Paste a transcript (maximum 100,000 characters).'});
-  if(req.body?.consent!==true)return res.status(400).json({error:'Confirm the Google Gemini Free Tier data-use notice before sending this transcript.'});
+  if(req.body?.consent!==true)return res.status(400).json({error:'Confirm the configured AI provider data-use notice before sending this transcript.'});
   if(!modes.has(recapMode))return res.status(400).json({error:'Invalid recap mode.'});
   if(!geminiStatus().configured)return res.status(503).json({error:'AI recap is not configured. Add GEMINI_API_KEY to the private server environment.'});
   const result=await generateBurmeseRecap({transcript,mode:recapMode,title});
@@ -216,13 +217,13 @@ app.post('/api/jobs/:id/transcribe',async(req,res,next)=>{
  try{
   const id=String(req.params.id);const job=getJob(id);
   if(!job)return res.status(404).json({error:'Job not found.'});
-  if(req.body?.consent!==true)return res.status(400).json({error:'Confirm the Google Gemini Free Tier audio data-use notice before sending audio.'});
-  if(!geminiStatus().configured)return res.status(503).json({error:'Audio transcription is not configured. Add GEMINI_API_KEY to the private server environment.'});
+  if(req.body?.consent!==true)return res.status(400).json({error:'Confirm the configured transcription provider data-use notice before sending audio.'});
+  if(!aiProvidersStatus().transcriptionConfigured)return res.status(503).json({error:'Audio transcription is not configured. Add GEMINI_API_KEY, or explicitly enable Groq transcription on the server.'});
   if(job.status==='transcribed')return res.json({item:job,note:'This job already has a transcript.'});
   if(!job.outputDir||!['media_ready','failed','transcribing'].includes(job.status))return res.status(409).json({error:'Complete media preparation before starting audio transcription.'});
   await updateJob(id,{status:'transcribing',stage:'transcription_queued',transcriptionConsentAt:job.transcriptionConsentAt||new Date().toISOString(),error:undefined,note:'Audio transcription queued. Completed chunks will be reused.'});
   void enqueueTranscriptionJob(id);
-  res.status(202).json({item:getJob(id),note:'Audio transcription queued. The video audio will be sent to Google Gemini under the consent you confirmed.'});
+  res.status(202).json({item:getJob(id),note:'Audio transcription queued. The video audio will be sent to the configured transcription provider under the consent you confirmed.'});
  }catch(e){next(e)}
 });
 app.post('/api/jobs/:id/recap-script',async(req,res,next)=>{
@@ -230,7 +231,7 @@ app.post('/api/jobs/:id/recap-script',async(req,res,next)=>{
   const id=String(req.params.id);
   const job=getJob(id);
   if(!job)return res.status(404).json({error:'Job not found.'});
-  if(req.body?.consent!==true)return res.status(400).json({error:'Confirm that this transcript may be sent to Google Gemini for Burmese recap script generation.'});
+  if(req.body?.consent!==true)return res.status(400).json({error:'Confirm that this transcript may be sent to the configured AI provider for Burmese recap script generation.'});
   const blocked=recapScriptBlockReason(job);
   if(blocked||!job.transcript)return res.status(409).json({error:blocked||'Complete audio transcription before generating a recap script.'});
   const project=getProject(job.projectId);
@@ -246,7 +247,7 @@ app.post('/api/ai/platform-pack',async(req,res,next)=>{
   const title=typeof req.body?.title==='string'?req.body.title.trim().slice(0,120):'AUREON AI Recap';
   const recapScript=typeof req.body?.recapScript==='string'?req.body.recapScript.trim():'';
   const date=typeof req.body?.date==='string'?req.body.date.slice(0,10):new Date().toISOString().slice(0,10);
-  if(req.body?.consent!==true)return res.status(400).json({error:'Confirm that the recap draft may be sent to Google Gemini to create separate platform versions.'});
+  if(req.body?.consent!==true)return res.status(400).json({error:'Confirm that the recap draft may be sent to the configured AI provider to create separate platform versions.'});
   if(!recapScript||recapScript.length>60000)return res.status(400).json({error:'Provide a recap script (maximum 60,000 characters).'});
   if(!geminiStatus().configured)return res.status(503).json({error:'AI recap is not configured. Add GEMINI_API_KEY to the private server environment.'});
   const result=await generatePlatformPack({title,recapScript,date});
@@ -260,7 +261,7 @@ app.use((error:unknown,_req:Request,res:Response,_next:NextFunction)=>{
  if(err.message.startsWith('Unsupported video type')||err.message.startsWith('Unsupported actor audio')||err.message.startsWith('Unsupported dialogue audio'))return res.status(415).json({error:err.message});
  if(err.message.startsWith('AI recap is not configured'))return res.status(503).json({error:err.message});
  if(err.message.startsWith('YouTube discovery is not configured'))return res.status(503).json({error:err.message});
- if(err.message.startsWith('Gemini request failed')||err.message.startsWith('Gemini transcription failed'))return res.status(502).json({error:err.message});
+ if(err.message.startsWith('Gemini request failed')||err.message.startsWith('Gemini transcription failed')||err.message.startsWith('Groq transcription failed')||err.message.startsWith('OpenRouter free model failed'))return res.status(502).json({error:err.message});
  if(err.message.startsWith('Myanmar TTS is not configured'))return res.status(503).json({error:err.message});
  if(err.message.startsWith('Azure Speech request failed'))return res.status(502).json({error:err.message});
  res.status(500).json({error:err.message||'Internal server error.'});

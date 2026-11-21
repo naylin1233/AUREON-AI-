@@ -1,4 +1,4 @@
-import { GEMINI_MODEL } from './gemini.js';
+import { generateOpenRouterFreeText, isTransientAiStatus } from './providers.js';
 
 export type PlatformPack = {
   youtube: { title: string; description: string; script: string; tags: string[] };
@@ -7,8 +7,6 @@ export type PlatformPack = {
 };
 
 export async function generatePlatformPack(input:{title:string;recapScript:string;date:string}) {
-  const key=process.env.GEMINI_API_KEY;
-  if(!key)throw new Error('AI recap is not configured. Add GEMINI_API_KEY to the private server environment.');
   if(!input.recapScript.trim()||input.recapScript.length>60000)throw new Error('Provide a recap script (maximum 60,000 characters).');
   const prompt=[
     'You are AUREON AI, a Burmese-first editorial producer.',
@@ -24,19 +22,34 @@ export async function generatePlatformPack(input:{title:string;recapScript:strin
     'RECAP DRAFT:',
     input.recapScript
   ].join('\n');
-  const response=await fetch('https://generativelanguage.googleapis.com/v1beta/interactions',{
+  let raw='';
+  let model='gemini-3.8-flash';
+  const key=process.env.GEMINI_API_KEY;
+  if(!key){
+   if(!process.env.OPENROUTER_API_KEY)throw new Error('AI platform pack is not configured. Add GEMINI_API_KEY or OPENROUTER_API_KEY to the private server environment.');
+   raw=await generateOpenRouterFreeText(prompt);model='openrouter/free';
+  }else{
+   const response=await fetch('https://generativelanguage.googleapis.com/v1beta/interactions',{
     method:'POST',headers:{'x-goog-api-key':key,'Content-Type':'application/json'},
-    body:JSON.stringify({model:GEMINI_MODEL,input:prompt,store:false}),
+    body:JSON.stringify({model,input:prompt,store:false}),
     signal:AbortSignal.timeout(120000)
-  });
-  const data=await response.json().catch(()=>({}));
-  if(!response.ok){const detail=typeof data?.error?.message==='string'?data.error.message:'HTTP '+response.status;throw new Error('Gemini request failed ('+response.status+'): '+detail.slice(0,300));}
-  const raw=Array.isArray(data.steps)?data.steps.filter((s:any)=>s?.type==='model_output').flatMap((s:any)=>Array.isArray(s.content)?s.content:[]).filter((p:any)=>p?.type==='text'&&typeof p.text==='string').map((p:any)=>p.text).join('\n').trim():'';
-  if(!raw)throw new Error('Gemini returned no platform content.');
+   });
+   const data=await response.json().catch(()=>({}));
+   if(!response.ok){
+    const detail=typeof data?.error?.message==='string'?data.error.message:'HTTP '+response.status;
+    if(isTransientAiStatus(response.status)&&process.env.OPENROUTER_API_KEY){
+     raw=await generateOpenRouterFreeText(prompt);model='openrouter/free';
+    }else throw new Error('Gemini request failed ('+response.status+'): '+detail.slice(0,300));
+   }else{
+    raw=Array.isArray(data.steps)?data.steps.filter((s:any)=>s?.type==='model_output').flatMap((s:any)=>Array.isArray(s.content)?s.content:[]).filter((p:any)=>p?.type==='text'&&typeof p.text==='string').map((p:any)=>p.text).join('\n').trim():'';
+    if(typeof data.model==='string')model=data.model;
+   }
+  }
+  if(!raw)throw new Error('AI provider returned no platform content.');
   const cleaned=raw.replace(/^\u0060{3}(?:json)?\s*/i,'').replace(/\s*\u0060{3}$/,'');
   let parsed:PlatformPack;
-  try{parsed=JSON.parse(cleaned) as PlatformPack;}catch{throw new Error('Gemini response was not valid platform-pack JSON. Please retry.');}
+  try{parsed=JSON.parse(cleaned) as PlatformPack;}catch{throw new Error('AI provider response was not valid platform-pack JSON. Please retry.');}
   const valid=(v:any)=>v&&typeof v==='object'&&typeof v.script==='string'&&Array.isArray(v.tags);
-  if(!valid(parsed.youtube)||!valid(parsed.facebook)||!valid(parsed.tiktok)||typeof parsed.youtube.title!=='string'||typeof parsed.facebook.title!=='string'||typeof parsed.tiktok.hook!=='string'||typeof parsed.tiktok.cta!=='string')throw new Error('Gemini returned an incomplete platform pack. Please retry.');
-  return {item:parsed,model:typeof data.model==='string'?data.model:GEMINI_MODEL};
+  if(!valid(parsed.youtube)||!valid(parsed.facebook)||!valid(parsed.tiktok)||typeof parsed.youtube.title!=='string'||typeof parsed.facebook.title!=='string'||typeof parsed.tiktok.hook!=='string'||typeof parsed.tiktok.cta!=='string')throw new Error('AI provider returned an incomplete platform pack. Please retry.');
+  return {item:parsed,model};
 }
