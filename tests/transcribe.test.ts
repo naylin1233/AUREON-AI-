@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtemp, writeFile, rm } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { transcribeAudioChunk } from '../server/ai/transcribe.ts';
+import { requestWithRetry, transcribeAudioChunk } from '../server/ai/transcribe.ts';
 
 test('uploads one audio chunk, transcribes it, and deletes the temporary Gemini file',async()=>{
  const dir=await mkdtemp(path.join(os.tmpdir(),'aureon-transcribe-test-'));
@@ -40,5 +40,41 @@ test('uploads one audio chunk, transcribes it, and deletes the temporary Gemini 
   globalThis.fetch=previousFetch;
   if(previousKey===undefined)delete process.env.GEMINI_API_KEY;else process.env.GEMINI_API_KEY=previousKey;
   await rm(dir,{recursive:true,force:true});
+ }
+});
+
+
+test('retries Gemini 503/429 responses using Retry-After and succeeds',async()=>{
+ const previousFetch=globalThis.fetch;
+ const calls:string[]=[];
+ globalThis.fetch=(async(input:any)=>{
+  const url=typeof input==='string'?input:input.url;
+  calls.push(url);
+  if(calls.length===1)return new Response(JSON.stringify({error:{message:'high demand'}}),{status:503,headers:{'content-type':'application/json','retry-after':'0'}});
+  if(calls.length===2)return new Response(JSON.stringify({error:{message:'rate limited'}}),{status:429,headers:{'content-type':'application/json','retry-after':'0'}});
+  return new Response(JSON.stringify({ok:true}),{status:200,headers:{'content-type':'application/json'}});
+ }) as typeof fetch;
+ try{
+  const response=await requestWithRetry('https://generativelanguage.googleapis.com/v1beta/interactions',{method:'POST',body:'{}'});
+  assert.equal(response.status,200);
+  assert.equal(calls.length,3);
+ }finally{
+  globalThis.fetch=previousFetch;
+ }
+});
+
+test('does not retry permanent Gemini client errors',async()=>{
+ const previousFetch=globalThis.fetch;
+ let calls=0;
+ globalThis.fetch=(async()=>{
+  calls++;
+  return new Response(JSON.stringify({error:{message:'invalid request'}}),{status:400,headers:{'content-type':'application/json'}});
+ }) as typeof fetch;
+ try{
+  const response=await requestWithRetry('https://generativelanguage.googleapis.com/v1beta/interactions',{method:'POST',body:'{}'});
+  assert.equal(response.status,400);
+  assert.equal(calls,1);
+ }finally{
+  globalThis.fetch=previousFetch;
  }
 });
