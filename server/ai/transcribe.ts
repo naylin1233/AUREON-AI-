@@ -32,7 +32,7 @@ export async function requestWithRetry(url:string,init:RequestInit,retries=MAX_G
  }
  throw new Error('Gemini request failed after retries.');
 }
-export async function transcribeAudioChunk(filePath:string,chunkIndex:number){
+async function transcribeWithGemini(filePath:string,chunkIndex:number){
  const key=process.env.GEMINI_API_KEY;
  if(!key)throw new Error('Gemini is not configured. Add GEMINI_API_KEY to the private server environment.');
  const bytes=await readFile(filePath);
@@ -100,7 +100,7 @@ export async function transcribeAudioChunk(filePath:string,chunkIndex:number){
    headers:{'x-goog-api-key':key,'Content-Type':'application/json'},
    body:JSON.stringify({model:GEMINI_MODEL,input:[{type:'text',text:prompt},{type:'audio',uri:fileUri,mime_type:'audio/wav'}],store:false})
   });
-  if(!interaction.ok)throw new Error('Gemini transcription failed: '+await errorMessage(interaction));
+  if(!interaction.ok)throw new Error('Gemini transcription failed ('+interaction.status+'): '+await errorMessage(interaction));
   const data=await interaction.json().catch(()=>({}));
   const output=Array.isArray(data.steps)?data.steps.filter((step:any)=>step?.type==='model_output').flatMap((step:any)=>Array.isArray(step.content)?step.content:[]).filter((part:any)=>part?.type==='text'&&typeof part.text==='string').map((part:any)=>part.text).join('\n').trim():typeof data.output_text==='string'?data.output_text.trim():'';
   if(!output)throw new Error('Gemini returned no usable transcript for audio chunk '+(chunkIndex+1)+'.');
@@ -108,5 +108,52 @@ export async function transcribeAudioChunk(filePath:string,chunkIndex:number){
   return normalizeTranscript(output);
  }finally{
   await fetch(API+'/v1beta/'+fileName,{method:'DELETE',headers:{'x-goog-api-key':key},signal:AbortSignal.timeout(15000)}).catch(()=>undefined);
+ }
+}
+
+
+async function transcribeWithGroq(filePath:string,chunkIndex:number){
+ const key=process.env.GROQ_API_KEY;
+ if(!key||process.env.GROQ_TRANSCRIPTION_ENABLED!=='true')throw new Error('Groq transcription is disabled. It requires GROQ_API_KEY and GROQ_TRANSCRIPTION_ENABLED=true.');
+ const bytes=await readFile(filePath);
+ if(bytes.length<100)throw new Error('Audio chunk is empty or too small to transcribe.');
+ if(bytes.length>25*1024*1024)throw new Error('Groq free-tier audio uploads are limited to 25 MB per request. Reduce the chunk size before enabling this provider.');
+ const form=new FormData();
+ form.append('file',new Blob([new Uint8Array(bytes)],{type:'audio/wav'}),`aureon-audio-chunk-${chunkIndex+1}.wav`);
+ form.append('model','whisper-large-v3-turbo');
+ form.append('response_format','json');
+ const response=await fetch('https://api.groq.com/openai/v1/audio/transcriptions',{
+  method:'POST',
+  headers:{Authorization:'Bearer '+key},
+  body:form,
+  signal:AbortSignal.timeout(300000)
+ });
+ const data=await response.json().catch(()=>({}));
+ if(!response.ok){
+  const detail=typeof data?.error?.message==='string'?data.error.message:'HTTP '+response.status;
+  throw new Error('Groq transcription failed ('+response.status+'): '+detail.slice(0,300));
+ }
+ const output=typeof data?.text==='string'?data.text.trim():'';
+ if(!output)throw new Error('Groq returned no usable transcript for audio chunk '+(chunkIndex+1)+'.');
+ return normalizeTranscript(output);
+}
+
+export async function transcribeAudioChunk(filePath:string,chunkIndex:number){
+ const groqEnabled=Boolean(process.env.GROQ_API_KEY)&&process.env.GROQ_TRANSCRIPTION_ENABLED==='true';
+ if(!process.env.GEMINI_API_KEY){
+  if(groqEnabled)return transcribeWithGroq(filePath,chunkIndex);
+  throw new Error('No audio transcription provider is configured. Add GEMINI_API_KEY, or explicitly enable the metered Groq fallback.');
+ }
+ try{
+  return await transcribeWithGemini(filePath,chunkIndex);
+ }catch(error){
+  const message=error instanceof Error?error.message:String(error);
+  const transient=/Gemini transcription failed \\((408|429|500|502|503|504)\\)/.test(message);
+  if(!groqEnabled||!transient)throw error;
+  try{return await transcribeWithGroq(filePath,chunkIndex);}
+  catch(fallbackError){
+   const fallbackMessage=fallbackError instanceof Error?fallbackError.message:String(fallbackError);
+   throw new Error(message+'; optional Groq fallback also failed: '+fallbackMessage);
+  }
  }
 }
