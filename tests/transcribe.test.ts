@@ -111,3 +111,48 @@ test('uses the explicitly enabled Groq Whisper fallback when Gemini is not confi
   await rm(dir,{recursive:true,force:true});
  }
 });
+
+
+test('falls back to explicitly enabled Groq after Gemini exhausts transient retries',async()=>{
+ const dir=await mkdtemp(path.join(os.tmpdir(),'aureon-groq-fallback-test-'));
+ const filePath=path.join(dir,'chunk.wav');
+ await writeFile(filePath,Buffer.alloc(256,7));
+ const previousFetch=globalThis.fetch;
+ const previousGemini=process.env.GEMINI_API_KEY;
+ const previousGroq=process.env.GROQ_API_KEY;
+ const previousEnabled=process.env.GROQ_TRANSCRIPTION_ENABLED;
+ process.env.GEMINI_API_KEY='test-gemini-key';
+ process.env.GROQ_API_KEY='test-groq-key';
+ process.env.GROQ_TRANSCRIPTION_ENABLED='true';
+ let interactionCalls=0;
+ let groqCalls=0;
+ const uploadUrl='https://generativelanguage.googleapis.com/upload/v1beta/files/test-session';
+ globalThis.fetch=(async(input:any,init:any={})=>{
+  const url=typeof input==='string'?input:input.url;
+  const method=init.method||'GET';
+  if(url==='https://generativelanguage.googleapis.com/upload/v1beta/files')return new Response('',{status:200,headers:{'x-goog-upload-url':uploadUrl}});
+  if(url===uploadUrl)return new Response(JSON.stringify({file:{name:'files/test-audio',uri:'https://generativelanguage.googleapis.com/files/test-audio',state:'ACTIVE'}}),{status:200,headers:{'content-type':'application/json'}});
+  if(url==='https://generativelanguage.googleapis.com/v1beta/interactions'){
+   interactionCalls++;
+   return new Response(JSON.stringify({error:{message:'high demand'}}),{status:503,headers:{'content-type':'application/json','retry-after':'0'}});
+  }
+  if(url==='https://generativelanguage.googleapis.com/v1beta/files/test-audio'&&method==='DELETE')return new Response('{}',{status:200});
+  if(url==='https://api.groq.com/openai/v1/audio/transcriptions'){
+   groqCalls++;
+   return new Response(JSON.stringify({text:'Groq fallback transcript'}),{status:200,headers:{'content-type':'application/json'}});
+  }
+  throw new Error('Unexpected request: '+method+' '+url);
+ }) as typeof fetch;
+ try{
+  const transcript=await transcribeAudioChunk(filePath,0);
+  assert.equal(transcript,'Groq fallback transcript');
+  assert.equal(interactionCalls,6);
+  assert.equal(groqCalls,1);
+ }finally{
+  globalThis.fetch=previousFetch;
+  if(previousGemini===undefined)delete process.env.GEMINI_API_KEY;else process.env.GEMINI_API_KEY=previousGemini;
+  if(previousGroq===undefined)delete process.env.GROQ_API_KEY;else process.env.GROQ_API_KEY=previousGroq;
+  if(previousEnabled===undefined)delete process.env.GROQ_TRANSCRIPTION_ENABLED;else process.env.GROQ_TRANSCRIPTION_ENABLED=previousEnabled;
+  await rm(dir,{recursive:true,force:true});
+ }
+});
