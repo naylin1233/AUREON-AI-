@@ -12,6 +12,7 @@ import { azureTtsStatus, synthesizeBurmese, type BurmeseVoice } from './tts/azur
 import { geminiStatus, generateBurmeseRecap } from './ai/gemini.js';
 import { generatePlatformPack } from './ai/platformPack.js';
 import { enqueueTranscriptionJob, resumePendingTranscriptionJobs } from './ai/transcriptionWorker.js';
+import { recapScriptBlockReason } from './ai/transcriptText.js';
 import { enqueueRenderJob, resumePendingRenderJobs } from './renderWorker.js';
 import { dailyTopicStatus, discoverReferencesManually, selectDailyTopic, startDailyTopicSelection, startDailyYouTubeReferenceDiscovery, youtubeReferenceDiscoveryStatus } from './youtubeDiscovery.js';
 import { authIsConfigured, validateAuthConfiguration, verifyAdminPassword, createSessionToken, setSessionCookie, clearSessionCookie, adminSessionIsValid, revokeAdminSession, requestOriginIsAllowed, requireAdminSession } from './auth.js';
@@ -230,7 +231,8 @@ app.post('/api/jobs/:id/recap-script',async(req,res,next)=>{
   const job=getJob(id);
   if(!job)return res.status(404).json({error:'Job not found.'});
   if(req.body?.consent!==true)return res.status(400).json({error:'Confirm that this transcript may be sent to Google Gemini for Burmese recap script generation.'});
-  if(job.status!=='transcribed'||!job.transcript?.trim())return res.status(409).json({error:'Complete audio transcription before generating a recap script.'});
+  const blocked=recapScriptBlockReason(job);
+  if(blocked||!job.transcript)return res.status(409).json({error:blocked||'Complete audio transcription before generating a recap script.'});
   const project=getProject(job.projectId);
   if(!project)return res.status(404).json({error:'Project not found.'});
   if(!geminiStatus().configured)return res.status(503).json({error:'AI recap is not configured. Add GEMINI_API_KEY to the private server environment.'});

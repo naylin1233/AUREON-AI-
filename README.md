@@ -50,6 +50,7 @@
 - Deletes each temporary Gemini Files API upload after transcription.
 - Requires explicit per-job consent; Google states that Free Tier content may be used to improve its products.
 - Audio transcription is not live-verified without a configured Gemini key and quota.
+- False-positive protection: the prompt asks Gemini to return `[no speech]` for silence, music or noise. Output that is only markers (`[no speech]`, `[unclear]`, `[music]`), a short "no speech" sentence, or fewer than 6 letters/digits is treated as an empty chunk and not saved as transcript text. If every chunk is empty, the job is marked `failed` (stage `transcription_no_speech`) and recap script generation stays blocked; retrying sends the audio to Gemini again. This is a heuristic, not a guarantee, and Gemini safety settings are unchanged.
 
 ## Run locally
 

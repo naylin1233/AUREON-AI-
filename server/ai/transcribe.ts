@@ -1,5 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import { GEMINI_MODEL } from './gemini.js';
+import { NO_SPEECH_MARKER, normalizeTranscript } from './transcriptText.js';
 
 const API='https://generativelanguage.googleapis.com';
 const wait=(ms:number)=>new Promise(resolve=>setTimeout(resolve,ms));
@@ -64,7 +65,10 @@ export async function transcribeAudioChunk(filePath:string,chunkIndex:number){
    'Do not translate, summarize, explain, or invent any speech.',
    'Use speaker labels only when speakers are clearly distinguishable.',
    'If a short section cannot be understood, mark it as [unclear] rather than guessing.',
-   'Return only the transcript text, with paragraph breaks where natural.',
+   'If the audio contains only silence, music, background noise, or no intelligible speech, return exactly '+NO_SPEECH_MARKER+' and nothing else.',
+   'Never write words, captions, credits, greetings, or sign-offs that you cannot clearly hear. Silence and music must never be transcribed as speech.',
+   'If only part of the chunk contains speech, transcribe only that speech and leave out silent or musical parts. Do not describe sounds or music.',
+   'Return only the transcript text, with paragraph breaks where natural. Do not add commentary or explanations.',
    'This is audio chunk '+(chunkIndex+1)+'.'
   ].join('\n');
   const interaction=await fetch(API+'/v1beta/interactions',{
@@ -76,8 +80,9 @@ export async function transcribeAudioChunk(filePath:string,chunkIndex:number){
   if(!interaction.ok)throw new Error('Gemini transcription failed: '+await errorMessage(interaction));
   const data=await interaction.json().catch(()=>({}));
   const output=Array.isArray(data.steps)?data.steps.filter((step:any)=>step?.type==='model_output').flatMap((step:any)=>Array.isArray(step.content)?step.content:[]).filter((part:any)=>part?.type==='text'&&typeof part.text==='string').map((part:any)=>part.text).join('\n').trim():typeof data.output_text==='string'?data.output_text.trim():'';
-  if(output.length<5)throw new Error('Gemini returned no usable transcript for audio chunk '+(chunkIndex+1)+'.');
-  return output;
+  if(!output)throw new Error('Gemini returned no usable transcript for audio chunk '+(chunkIndex+1)+'.');
+  // '' means the chunk was understood but contains no usable speech (silence, music, markers only, or too short).
+  return normalizeTranscript(output);
  }finally{
   await fetch(API+'/v1beta/'+fileName,{method:'DELETE',headers:{'x-goog-api-key':key},signal:AbortSignal.timeout(15000)}).catch(()=>undefined);
  }
