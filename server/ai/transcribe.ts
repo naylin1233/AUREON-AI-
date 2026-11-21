@@ -8,21 +8,27 @@ async function errorMessage(response:Response){
  const data=await response.json().catch(()=>({}));
  return typeof data?.error?.message==='string'?data.error.message.slice(0,400):'HTTP '+response.status;
 }
-async function requestWithRetry(url:string,init:RequestInit,retries=2){
- let lastError:unknown;
- for(let attempt=0;attempt<=retries;attempt++){
-  try{
-   const response=await fetch(url,{...init,signal:AbortSignal.timeout(300000)});
-   if(![408,429,500,502,503,504].includes(response.status)||attempt===retries)return response;
-   lastError=new Error('Temporary Gemini HTTP '+response.status);
-  }catch(error){
-   lastError=error;
-   const name=error instanceof Error?error.name:'';
-   if(!['AbortError','TimeoutError','TypeError'].includes(name)||attempt===retries)throw error;
-  }
-  await wait(Math.min(10000,1500*(2**attempt)));
+const RETRYABLE_GEMINI_STATUSES=new Set([408,429,500,502,503,504]);
+const MAX_GEMINI_RETRIES=5;
+function retryDelayMs(response:Response,attempt:number){
+ const retryAfter=response.headers.get('retry-after');
+ if(retryAfter){
+  const seconds=Number(retryAfter);
+  if(Number.isFinite(seconds)&&seconds>=0)return Math.min(30000,seconds*1000);
+  const date=Date.parse(retryAfter);
+  if(Number.isFinite(date))return Math.min(30000,Math.max(0,date-Date.now()));
  }
- throw lastError instanceof Error?lastError:new Error('Gemini request failed after retries.');
+ return Math.min(15000,1000*(2**attempt));
+}
+export async function requestWithRetry(url:string,init:RequestInit,retries=MAX_GEMINI_RETRIES){
+ for(let attempt=0;attempt<=retries;attempt++){
+  // Retry only explicit transient HTTP responses. Retrying a network timeout on a
+  // POST can duplicate a request that Gemini already processed.
+  const response=await fetch(url,{...init,signal:AbortSignal.timeout(300000)});
+  if(!RETRYABLE_GEMINI_STATUSES.has(response.status)||attempt===retries)return response;
+  await wait(retryDelayMs(response,attempt));
+ }
+ throw new Error('Gemini request failed after retries.');
 }
 export async function transcribeAudioChunk(filePath:string,chunkIndex:number){
  const key=process.env.GEMINI_API_KEY;
